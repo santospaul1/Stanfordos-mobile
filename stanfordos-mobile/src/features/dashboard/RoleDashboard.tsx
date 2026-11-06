@@ -9,7 +9,7 @@ import {
 import { useAuth } from "../auth/AuthContext";
 import type { UserRole } from "../../constants/roles";
 import { ROLE_LABELS } from "../../constants/roles";
-
+import { OfflineBanner } from "../../components/feedback/OfflineBanner";
 interface Props {
   role: UserRole;
 }
@@ -68,6 +68,7 @@ export function RoleDashboard({ role }: Props) {
       style={styles.screen}
       contentContainerStyle={styles.content}
     >
+         <OfflineBanner />
       <View style={styles.header}>
         <View>
           <Text style={styles.brand}>Stanfordos</Text>

@@ -7,30 +7,41 @@ import React, {
   useState,
 } from "react";
 
+import { useQueryClient } from "@tanstack/react-query";
+
 import type { AuthSession } from "../../types/auth";
 import { sessionStorage } from "../../services/session-storage";
 
-type AuthStatus = "loading" | "authenticated" | "unauthenticated";
+type AuthStatus =
+  | "loading"
+  | "authenticated"
+  | "unauthenticated";
 
 interface AuthContextValue {
   session: AuthSession | null;
   status: AuthStatus;
   isAuthenticated: boolean;
+
   signIn: (session: AuthSession) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextValue | undefined>(
-  undefined
-);
+const AuthContext = createContext<
+  AuthContextValue | undefined
+>(undefined);
 
 export function AuthProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [session, setSession] = useState<AuthSession | null>(null);
-  const [status, setStatus] = useState<AuthStatus>("loading");
+  const queryClient = useQueryClient();
+
+  const [session, setSession] =
+    useState<AuthSession | null>(null);
+
+  const [status, setStatus] =
+    useState<AuthStatus>("loading");
 
   useEffect(() => {
     let active = true;
@@ -41,12 +52,15 @@ export function AuthProvider({
 
         if (!active) return;
 
-        // Provisional restoration only.
-        // A backend session-validation request must be added
-        // before this is considered production authentication.
+        // This is still provisional restoration.
+        // A backend validation request must be added
+        // before production use.
         setSession(savedSession);
+
         setStatus(
-          savedSession ? "authenticated" : "unauthenticated"
+          savedSession
+            ? "authenticated"
+            : "unauthenticated"
         );
       } catch {
         if (!active) return;
@@ -63,19 +77,28 @@ export function AuthProvider({
     };
   }, []);
 
-  const signIn = useCallback(async (newSession: AuthSession) => {
-    await sessionStorage.save(newSession);
+  const signIn = useCallback(
+    async (newSession: AuthSession) => {
+      // Never reuse cached records from an earlier account.
+      queryClient.clear();
 
-    setSession(newSession);
-    setStatus("authenticated");
-  }, []);
+      await sessionStorage.save(newSession);
+
+      setSession(newSession);
+      setStatus("authenticated");
+    },
+    [queryClient]
+  );
 
   const signOut = useCallback(async () => {
+    // Remove cached school information before ending the session.
+    queryClient.clear();
+
     await sessionStorage.clear();
 
     setSession(null);
     setStatus("unauthenticated");
-  }, []);
+  }, [queryClient]);
 
   const value = useMemo(
     () => ({
@@ -99,7 +122,9 @@ export function useAuth() {
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error("useAuth must be used inside AuthProvider");
+    throw new Error(
+      "useAuth must be used inside AuthProvider"
+    );
   }
 
   return context;
