@@ -10,6 +10,8 @@ import React, {
 import type { AuthSession, LoginCredentials } from "../../types/auth";
 import type { AuthRepository } from "./auth.repository";
 import { mockAuthRepository } from "./mock-auth.repository";
+import { backendAuthRepository } from "./backend-auth.repository";
+import { ENV } from "../../config/env";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -17,7 +19,6 @@ interface AuthContextValue {
   session: AuthSession | null;
   status: AuthStatus;
   isAuthenticated: boolean;
-  /** Development-only flag — becomes false when BackendAuthRepository is used */
   isMockAuth: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
   signOut: () => Promise<void>;
@@ -27,11 +28,9 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-/**
- * Swap this when the real tenant-aware backend login is ready:
- *   const authRepository: AuthRepository = backendAuthRepository;
- */
-const authRepository: AuthRepository = mockAuthRepository;
+const authRepository: AuthRepository = ENV.USE_MOCK_AUTH
+  ? mockAuthRepository
+  : backendAuthRepository;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
@@ -81,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       status,
       isAuthenticated: status === "authenticated",
-      isMockAuth: true,
+      isMockAuth: ENV.USE_MOCK_AUTH,
       login,
       signOut,
       signIn,

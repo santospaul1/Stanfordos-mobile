@@ -1,52 +1,53 @@
 # Stanfordos Mobile — Apply sources
 
-Copy this folder’s contents into local `stanfordos-mobile/src/` (same relative paths). Overwrite when asked.
+Copy into local `stanfordos-mobile/src/` (same paths). Also copy `.env.example` to project root as `.env`.
 
-## Teacher section — complete (mock data)
+## Design choice (GPT screens vs current UI)
 
-| Module | Routes |
-|--------|--------|
-| My classes | `/(teacher)/classes`, `/(teacher)/classes/[classSectionId]` |
-| Attendance | `/(teacher)/attendance`, `/(teacher)/attendance/[classSectionId]` |
-| Marks entry | `/(teacher)/marks`, `/(teacher)/marks/entry` |
-| Assignments | `/(teacher)/assignments`, `/(teacher)/assignments/[assignmentId]` |
-| Timetable | `/(teacher)/timetable` |
-| Announcements | `/(teacher)/announcements` |
+**Recommendation: keep our structure, borrow their UX patterns.**
 
-All six tiles on the teacher dashboard navigate to working screens.
+| GPT mockups | Our app |
+|-------------|---------|
+| Bright consumer tiles, bottom tabs, per-screen themes | One brand system across 7 roles |
+| Strong on student/parent home | Strong on role coverage + consistency |
 
-### Shared
-- `components/ui/*` — Button, Card, Screen, Badge, EmptyState, ErrorBanner
-- `constants/brand.ts`
-- `hooks/use-online.ts` — online gate for saves
+What we took from the mockups:
+- Search bars on list screens
+- Clearer empty states with icon + optional action
+- Status chips for attendance / badges
+- Colored summary cards already present on dashboards
 
-### Feature mocks
-- `features/classes/*`
-- `features/attendance/*`
-- `features/marks/*`
-- `features/assignments/*`
-- `features/timetable/*`
-- `features/announcements/*`
+What we did **not** do (on purpose):
+- Full visual redesign to purple gradients / multi-color tile grids
+- Bottom-tab shell for every role (can add later per role)
 
-### Rules enforced
-- Marks & attendance **save only while online** (no offline write queue)
-- Marks UI is ready; **do not expose student/parent mark reads in production** until backend MOB-BE-02 ownership is fixed
-- Status enums align with backend audit (attendance: PRESENT/LATE/ABSENT/EXCUSED)
+Rebranding to match those images is a separate design pass after flows are solid.
 
-## How to test teacher flow
-1. Copy files → `npx expo start`
-2. Login: `teacher@demo.com` / `password123`
-3. Open each module from the dashboard:
-   - **My classes** → class roster
-   - **Attendance** → take & save
-   - **Marks entry** → pick exam + class → enter scores → save
-   - **Assignments** → list → submissions
-   - **Timetable** → day chips
-   - **Announcements** → list + compose (online)
+## New this slice
 
-## Demo accounts
-Password for all: `password123`  
-admin@demo.com · teacher@demo.com · student@demo.com · parent@demo.com · librarian@demo.com · accountant@demo.com · platform@demo.com
+### UX
+- `components/ui/SearchBar.tsx`
+- `components/ui/StatusChip.tsx`
+- Improved `EmptyState` (icon + optional action button)
+- Search wired on teacher attendance, admin students, librarian catalogue
 
-## Next (after teacher)
-Student section, then parent, then finance/library.
+### Real API client layer
+- `config/env.ts` — `USE_MOCK_AUTH` / `USE_MOCK_DATA` flags
+- `api/client.ts` — Axios instance, bearer token, single-flight refresh
+- `api/errors.ts` — normalized `ApiError`
+- `api/endpoints.ts` — audited backend paths only
+- `api/auth.api.ts` — login/logout/sessions
+- `features/auth/backend-auth.repository.ts` — production auth adapter
+
+Switch auth:
+```
+EXPO_PUBLIC_USE_MOCK_AUTH=false
+```
+Only after backend supports tenant-aware native login (MOB-BE-01). Until then keep mock auth.
+
+## All role modules (mock data)
+Teacher · Student · Parent · Accountant · Librarian · Admin · Platform admin — every dashboard tile has a screen.
+
+## Demo logins
+Password: `password123`  
+teacher@demo.com · student@demo.com · parent@demo.com · accountant@demo.com · librarian@demo.com · admin@demo.com · platform@demo.com

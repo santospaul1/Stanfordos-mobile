@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 
-import { Screen, Card, EmptyState, ErrorBanner } from "../../../components/ui";
+import { Screen, Card, EmptyState, ErrorBanner, SearchBar } from "../../../components/ui";
 import { Brand } from "../../../constants/brand";
 import {
   mockAttendanceService,
@@ -19,6 +19,7 @@ export default function TeacherAttendanceClassesScreen() {
   const [classes, setClasses] = useState<ClassSectionSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {
     setError(null);
@@ -61,10 +62,26 @@ export default function TeacherAttendanceClassesScreen() {
         <EmptyState
           title="No classes assigned"
           description="When classes are assigned to you, they will appear here."
+          icon="📚"
         />
       ) : (
+        <>
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search class…"
+        />
         <View style={styles.list}>
-          {classes.map((cls) => (
+          {classes
+            .filter((cls) => {
+              const q = query.trim().toLowerCase();
+              if (!q) return true;
+              return (
+                cls.name.toLowerCase().includes(q) ||
+                cls.gradeLevelName.toLowerCase().includes(q)
+              );
+            })
+            .map((cls) => (
             <Card
               key={cls.id}
               onPress={() =>
@@ -94,6 +111,7 @@ export default function TeacherAttendanceClassesScreen() {
             </Card>
           ))}
         </View>
+        </>
       )}
     </Screen>
   );
