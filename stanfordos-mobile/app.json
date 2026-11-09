@@ -12,8 +12,8 @@
       "bundleIdentifier": "ke.co.stanfordos.mobile"
     },
     "android": {
-      "package": "ke.co.stanfordos.mobile",
-      "edgeToEdgeEnabled": true
+      "package": "ke.co.stanfordos.mobile"
+      
     },
     "plugins": ["expo-router", "expo-secure-store", "expo-notifications"],
     "experiments": {

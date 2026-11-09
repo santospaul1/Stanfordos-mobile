@@ -10,7 +10,7 @@ import { router, useFocusEffect } from "expo-router";
 
 import { Screen, Card, EmptyState, ErrorBanner } from "../../../components/ui";
 import { Brand } from "../../../constants/brand";
-import { mockClassesService } from "../../../features/classes/mock-classes";
+import { classesService } from "../../../features/classes/classes.service";
 import type { TeacherClassSummary } from "../../../features/classes/types";
 
 export default function TeacherClassesScreen() {

@@ -1,31 +1,44 @@
 /**
- * Public env only. Never put secrets in EXPO_PUBLIC_*.
+ * Public environment configuration.
+ * Never put secrets in EXPO_PUBLIC_* variables.
  *
- * EXPO_PUBLIC_API_URL=https://stanfordos.co.ke/api
+ * EXPO_PUBLIC_API_URL=https://your-api-domain.com
  * EXPO_PUBLIC_USE_MOCK_AUTH=true
- * EXPO_PUBLIC_USE_MOCK_DATA=true
+ * EXPO_PUBLIC_USE_MOCK_DATA=false
  */
-const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "https://stanfordos.co.ke/api";
 
 function flag(name: string, fallback: boolean): boolean {
   const raw = process.env[name];
-  if (raw == null || raw === "") return fallback;
-  return raw === "1" || raw.toLowerCase() === "true";
+
+  if (raw == null || raw.trim() === "") {
+    return fallback;
+  }
+
+  return ["1", "true", "yes"].includes(raw.toLowerCase());
 }
 
+function normalizeApiUrl(value: string): string {
+  // API_ENDPOINTS already contains /api/... paths.
+  // Remove a trailing /api to prevent /api/api/... requests.
+  return value
+    .trim()
+    .replace(/\/+$/, "")
+    .replace(/\/api$/i, "");
+}
+
+const rawApiUrl =
+  process.env.EXPO_PUBLIC_API_URL ?? "https://your-api-domain.com";
+
 export const ENV = {
-  API_URL: apiUrl.replace(/\/$/, ""),
+  API_URL: normalizeApiUrl(rawApiUrl),
+
   APP_NAME: process.env.EXPO_PUBLIC_APP_NAME ?? "Stanfordos",
+
   ENVIRONMENT: process.env.EXPO_PUBLIC_ENVIRONMENT ?? "development",
+
   IS_PRODUCTION: process.env.EXPO_PUBLIC_ENVIRONMENT === "production",
-  /**
-   * When true, AuthContext uses MockAuthRepository.
-   * Set false once tenant-aware backend login is ready.
-   */
+
   USE_MOCK_AUTH: flag("EXPO_PUBLIC_USE_MOCK_AUTH", true),
-  /**
-   * When true, feature screens use mock-* services.
-   * Flip modules to API clients gradually.
-   */
+
   USE_MOCK_DATA: flag("EXPO_PUBLIC_USE_MOCK_DATA", true),
 };
