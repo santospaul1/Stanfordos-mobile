@@ -23,18 +23,23 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<any[]>([]);
   const load = useCallback(async () => {
-    setError(null); setLoading(true);
+    setError(null);
+    setLoading(true);
     try {
-      const { mockAdminService } = await import("../../../features/admin/mock-admin");
+      const { mockAdminService } =
+        await import("../../../features/admin/mock-admin");
       setItems(await mockAdminService.getFeeSnapshot());
-    } catch (e) { setError(e instanceof Error ? e.message : "Failed to load."); }
-    finally { setLoading(false); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load])
+    }, [load]),
   );
 
   return (
@@ -55,12 +60,21 @@ export default function Page() {
         </View>
       ) : (
         <>
-          {items.length === 0 ? <EmptyState title="No fee data" /> : (
+          {items.length === 0 ? (
+            <EmptyState title="No fee data" />
+          ) : (
             <View style={styles.list}>
               {items.map((f) => (
                 <Card key={f.label}>
                   <Text style={styles.name}>{f.label}</Text>
-                  <Text style={[styles.name, { marginTop: 6, color: Brand.primary }]}>KSh {f.amount.toLocaleString()}</Text>
+                  <Text
+                    style={[
+                      styles.name,
+                      { marginTop: 6, color: Brand.primary },
+                    ]}
+                  >
+                    KSh {f.amount.toLocaleString()}
+                  </Text>
                   <Text style={styles.meta}>Trend {f.trend}</Text>
                 </Card>
               ))}
@@ -74,9 +88,19 @@ export default function Page() {
 
 const styles = StyleSheet.create({
   header: { marginBottom: 18 },
-  back: { color: Brand.primary, fontSize: 16, fontWeight: "700", marginBottom: 12 },
+  back: {
+    color: Brand.primary,
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 12,
+  },
   title: { fontSize: 26, fontWeight: "800", color: Brand.text },
-  subtitle: { marginTop: 6, fontSize: 14, color: Brand.textSecondary, lineHeight: 20 },
+  subtitle: {
+    marginTop: 6,
+    fontSize: 14,
+    color: Brand.textSecondary,
+    lineHeight: 20,
+  },
   center: { paddingVertical: 48, alignItems: "center" },
   list: { gap: 8 },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
@@ -93,7 +117,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: Brand.text,
   },
-  statGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
+  statGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
   statCard: {
     width: "47%",
     flexGrow: 1,
