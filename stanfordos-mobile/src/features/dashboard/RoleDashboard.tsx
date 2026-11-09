@@ -1,124 +1,262 @@
 import React from "react";
 import {
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { router, type Href } from "expo-router";
+
 import { useAuth } from "../auth/AuthContext";
 import type { UserRole } from "../../constants/roles";
 import { ROLE_LABELS } from "../../constants/roles";
+
+/** Known module routes implemented so far. Others stay placeholders. */
+const MODULE_ROUTES: Partial<Record<UserRole, Record<string, string>>> = {
+  TEACHER: {
+    classes: "/(teacher)/classes",
+    attendance: "/(teacher)/attendance",
+    marks: "/(teacher)/marks",
+    assignments: "/(teacher)/assignments",
+    timetable: "/(teacher)/timetable",
+    announcements: "/(teacher)/announcements",
+  },
+};
+
+interface ModuleItem {
+  id: string;
+  title: string;
+  description: string;
+  badge?: string;
+}
+
+interface DashboardConfig {
+  heading: string;
+  description: string;
+  stats: { label: string; value: string }[];
+  modules: ModuleItem[];
+}
+
+const DASHBOARD_CONTENT: Record<UserRole, DashboardConfig> = {
+  ADMIN: {
+    heading: "School overview",
+    description: "Manage operations across your school.",
+    stats: [
+      { label: "Students", value: "1,248" },
+      { label: "Teachers", value: "86" },
+      { label: "Classes", value: "42" },
+      { label: "Attendance today", value: "94%" },
+    ],
+    modules: [
+      { id: "students", title: "Students", description: "Profiles, enrollment and records" },
+      { id: "teachers", title: "Teachers", description: "Staff directory and assignments" },
+      { id: "classes", title: "Classes & sections", description: "Streams, subjects and terms" },
+      { id: "attendance", title: "Attendance", description: "Daily tracking and reports" },
+      { id: "fees", title: "Fees", description: "Invoices, balances and payments" },
+      { id: "reports", title: "Reports", description: "Academic and operational insights" },
+    ],
+  },
+  TEACHER: {
+    heading: "Teaching overview",
+    description: "Your classes, attendance and academic work.",
+    stats: [
+      { label: "My classes", value: "4" },
+      { label: "Students", value: "128" },
+      { label: "Pending marks", value: "2" },
+      { label: "Assignments due", value: "5" },
+    ],
+    modules: [
+      { id: "classes", title: "My classes", description: "Sections you teach" },
+      { id: "attendance", title: "Attendance", description: "Take and review attendance" },
+      { id: "marks", title: "Marks entry", description: "Record exam and continuous scores" },
+      { id: "assignments", title: "Assignments", description: "Create, grade and feedback" },
+      { id: "timetable", title: "Timetable", description: "Your weekly schedule" },
+      { id: "announcements", title: "Announcements", description: "Post to your classes" },
+    ],
+  },
+  STUDENT: {
+    heading: "My learning",
+    description: "Your timetable, results and assignments.",
+    stats: [
+      { label: "Attendance", value: "96%" },
+      { label: "Open tasks", value: "3" },
+      { label: "Next exam", value: "Fri" },
+      { label: "Fee balance", value: "KSh 0" },
+    ],
+    modules: [
+      { id: "timetable", title: "Timetable", description: "This week's classes" },
+      { id: "assignments", title: "Assignments", description: "Submit and track work" },
+      { id: "results", title: "Results", description: "Marks and report cards" },
+      { id: "attendance", title: "Attendance", description: "Your attendance history" },
+      { id: "fees", title: "Fees", description: "Invoices and payment history" },
+      { id: "library", title: "Library", description: "Borrowed books and due dates" },
+    ],
+  },
+  PARENT: {
+    heading: "Parent overview",
+    description: "Stay up to date with your children.",
+    stats: [
+      { label: "Children", value: "2" },
+      { label: "Avg attendance", value: "95%" },
+      { label: "Open fees", value: "1" },
+      { label: "New notices", value: "3" },
+    ],
+    modules: [
+      { id: "children", title: "My children", description: "Switch and view profiles" },
+      { id: "attendance", title: "Attendance", description: "Daily and term summaries" },
+      { id: "academics", title: "Academic performance", description: "Marks and report cards" },
+      { id: "fees", title: "Fees", description: "Balances and receipts" },
+      { id: "notifications", title: "Notifications", description: "School and class updates" },
+      { id: "messages", title: "Messages", description: "Contact teachers (coming soon)" },
+    ],
+  },
+  LIBRARIAN: {
+    heading: "Library overview",
+    description: "Catalogue, loans and returns.",
+    stats: [
+      { label: "Titles", value: "4,120" },
+      { label: "On loan", value: "318" },
+      { label: "Overdue", value: "27" },
+      { label: "Returns today", value: "14" },
+    ],
+    modules: [
+      { id: "catalogue", title: "Book catalogue", description: "Search and manage titles" },
+      { id: "borrowing", title: "Borrowing", description: "Issue books to students" },
+      { id: "returns", title: "Returns", description: "Check-in and clear loans" },
+      { id: "inventory", title: "Inventory", description: "Copies and stock levels" },
+      { id: "history", title: "Loan history", description: "By student or title" },
+      { id: "reports", title: "Library reports", description: "Usage and overdue lists" },
+    ],
+  },
+  ACCOUNTANT: {
+    heading: "Finance overview",
+    description: "Fees, payments and receipts.",
+    stats: [
+      { label: "Collected (term)", value: "KSh 12.4M" },
+      { label: "Outstanding", value: "KSh 1.8M" },
+      { label: "Invoices", value: "1,102" },
+      { label: "Payments today", value: "38" },
+    ],
+    modules: [
+      { id: "invoices", title: "Fee invoices", description: "Generate and manage invoices" },
+      { id: "payments", title: "Payments", description: "Record and reconcile payments" },
+      { id: "balances", title: "Outstanding balances", description: "Follow up on arrears" },
+      { id: "receipts", title: "Receipts", description: "Download and share receipts" },
+      { id: "items", title: "Fee items", description: "Configure fee structure" },
+      { id: "reports", title: "Financial reports", description: "Term and year summaries" },
+    ],
+  },
+  PLATFORM_ADMIN: {
+    heading: "Platform overview",
+    description: "Schools, subscriptions and system health.",
+    stats: [
+      { label: "Schools", value: "24" },
+      { label: "Active users", value: "18.2k" },
+      { label: "Trials", value: "5" },
+      { label: "Open tickets", value: "7" },
+    ],
+    modules: [
+      { id: "schools", title: "Schools", description: "Onboard and manage tenants" },
+      { id: "users", title: "Platform users", description: "Cross-tenant administrators" },
+      { id: "subscriptions", title: "Subscriptions", description: "Plans and billing status" },
+      { id: "analytics", title: "Platform analytics", description: "Usage and growth" },
+      { id: "system", title: "System admin", description: "Health, jobs and config" },
+      { id: "support", title: "Support", description: "Tickets and announcements" },
+    ],
+  },
+};
 
 interface Props {
   role: UserRole;
 }
 
-const DASHBOARD_CONTENT: Record<
-  UserRole,
-  {
-    heading: string;
-    description: string;
-    modules: string[];
-  }
-> = {
-  ADMIN: {
-    heading: "School overview",
-    description: "Manage your school operations.",
-    modules: ["Students", "Teachers", "Classes", "Attendance"],
-  },
-  TEACHER: {
-    heading: "Teaching overview",
-    description: "Manage your classes and academic activities.",
-    modules: ["My classes", "Attendance", "Examinations", "Assignments"],
-  },
-  STUDENT: {
-    heading: "My learning",
-    description: "View your academic information and learning activities.",
-    modules: ["My timetable", "Attendance", "Results", "Assignments"],
-  },
-  PARENT: {
-    heading: "Parent overview",
-    description: "Keep track of your children's school activities.",
-    modules: ["My children", "Attendance", "Academic results", "Fees"],
-  },
-  LIBRARIAN: {
-    heading: "Library overview",
-    description: "Manage library operations and resources.",
-    modules: ["Book catalogue", "Borrowing", "Returns", "Library records"],
-  },
-  ACCOUNTANT: {
-    heading: "Finance overview",
-    description: "Manage school financial operations.",
-    modules: ["Fee records", "Payments", "Outstanding balances", "Receipts"],
-  },
-  PLATFORM_ADMIN: {
-    heading: "Platform overview",
-    description: "Manage the Stanfordos platform.",
-    modules: ["Schools", "Platform users", "Subscriptions", "Platform reports"],
-  },
-};
-
 export function RoleDashboard({ role }: Props) {
-  const { session, signOut } = useAuth();
+  const { session, signOut, isMockAuth } = useAuth();
+  const insets = useSafeAreaInsets();
   const content = DASHBOARD_CONTENT[role];
 
   return (
     <ScrollView
       style={styles.screen}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[
+        styles.content,
+        { paddingTop: Math.max(insets.top, 16) + 12, paddingBottom: 40 },
+      ]}
     >
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerLeft}>
           <Text style={styles.brand}>Stanfordos</Text>
           <Text style={styles.role}>{ROLE_LABELS[role]}</Text>
+          {session?.tenant?.name ? (
+            <Text style={styles.tenant}>{session.tenant.name}</Text>
+          ) : null}
         </View>
 
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={signOut}
-        >
+        <Pressable style={styles.logoutButton} onPress={signOut}>
           <Text style={styles.logoutText}>Sign out</Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       <View style={styles.welcome}>
         <Text style={styles.greeting}>
           Hello, {session?.user.name ?? "User"}
         </Text>
-
         <Text style={styles.heading}>{content.heading}</Text>
-
-        <Text style={styles.description}>
-          {content.description}
-        </Text>
+        <Text style={styles.description}>{content.description}</Text>
       </View>
 
-      <Text style={styles.sectionTitle}>Your modules</Text>
-
-      <View style={styles.moduleList}>
-        {content.modules.map((module) => (
-          <View key={module} style={styles.moduleCard}>
-            <View style={styles.moduleIcon}>
-              <Text style={styles.moduleInitial}>
-                {module.charAt(0)}
-              </Text>
-            </View>
-
-            <View style={styles.moduleTextContainer}>
-              <Text style={styles.moduleTitle}>{module}</Text>
-              <Text style={styles.moduleDescription}>
-                Module setup pending
-              </Text>
-            </View>
+      <View style={styles.statsGrid}>
+        {content.stats.map((stat) => (
+          <View key={stat.label} style={styles.statCard}>
+            <Text style={styles.statValue}>{stat.value}</Text>
+            <Text style={styles.statLabel}>{stat.label}</Text>
           </View>
         ))}
       </View>
 
-      <Text style={styles.notice}>
-        Dashboard preview. Live school data and module navigation
-        will be connected after the backend API audit.
-      </Text>
+      <Text style={styles.sectionTitle}>Modules</Text>
+
+      <View style={styles.moduleList}>
+        {content.modules.map((module) => (
+          <Pressable
+            key={module.id}
+            style={({ pressed }) => [
+              styles.moduleCard,
+              pressed && styles.moduleCardPressed,
+            ]}
+            onPress={() => {
+              const route = MODULE_ROUTES[role]?.[module.id];
+              if (route) {
+                router.push(route as Href);
+              }
+            }}
+          >
+            <View style={styles.moduleIcon}>
+              <Text style={styles.moduleInitial}>
+                {module.title.charAt(0)}
+              </Text>
+            </View>
+            <View style={styles.moduleTextContainer}>
+              <Text style={styles.moduleTitle}>{module.title}</Text>
+              <Text style={styles.moduleDescription}>{module.description}</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {isMockAuth ? (
+        <Text style={styles.notice}>
+          Demo mode — stats are sample data. Module screens and live API data
+          will connect after backend integration.
+        </Text>
+      ) : (
+        <Text style={styles.notice}>
+          Module navigation and live school data are being connected.
+        </Text>
+      )}
     </ScrollView>
   );
 }
@@ -129,13 +267,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8FAFC",
   },
   content: {
-    padding: 22,
-    paddingTop: 56,
+    paddingHorizontal: 20,
   },
   header: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
+  },
+  headerLeft: {
+    flex: 1,
+    paddingRight: 12,
   },
   brand: {
     fontSize: 22,
@@ -146,6 +287,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#64748B",
     marginTop: 4,
+    fontWeight: "600",
+  },
+  tenant: {
+    fontSize: 12,
+    color: "#1D4ED8",
+    marginTop: 2,
+    fontWeight: "600",
   },
   logoutButton: {
     paddingHorizontal: 14,
@@ -159,33 +307,60 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   welcome: {
-    marginTop: 36,
-    marginBottom: 30,
+    marginTop: 28,
+    marginBottom: 20,
   },
   greeting: {
     fontSize: 14,
     color: "#64748B",
   },
   heading: {
-    fontSize: 27,
+    fontSize: 26,
     fontWeight: "800",
     color: "#0F172A",
-    marginTop: 8,
+    marginTop: 6,
   },
   description: {
     color: "#64748B",
     fontSize: 14,
-    marginTop: 8,
-    lineHeight: 21,
+    marginTop: 6,
+    lineHeight: 20,
+  },
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 28,
+  },
+  statCard: {
+    width: "47%",
+    flexGrow: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  statLabel: {
+    fontSize: 12,
+    color: "#64748B",
+    marginTop: 4,
+    fontWeight: "500",
   },
   sectionTitle: {
     fontSize: 17,
     fontWeight: "700",
     color: "#0F172A",
-    marginBottom: 14,
+    marginBottom: 12,
   },
   moduleList: {
-    gap: 12,
+    gap: 10,
   },
   moduleCard: {
     flexDirection: "row",
@@ -194,7 +369,10 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    padding: 16,
+    padding: 14,
+  },
+  moduleCardPressed: {
+    backgroundColor: "#F1F5F9",
   },
   moduleIcon: {
     height: 44,
@@ -210,7 +388,9 @@ const styles = StyleSheet.create({
     color: "#1D4ED8",
   },
   moduleTextContainer: {
-    marginLeft: 14,
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
   },
   moduleTitle: {
     fontSize: 15,
@@ -220,13 +400,18 @@ const styles = StyleSheet.create({
   moduleDescription: {
     color: "#94A3B8",
     fontSize: 12,
-    marginTop: 4,
+    marginTop: 3,
+  },
+  chevron: {
+    fontSize: 22,
+    color: "#CBD5E1",
+    fontWeight: "300",
   },
   notice: {
-    marginTop: 26,
+    marginTop: 24,
     color: "#64748B",
     fontSize: 12,
-    lineHeight: 19,
+    lineHeight: 18,
     textAlign: "center",
   },
 });

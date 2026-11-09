@@ -7,8 +7,9 @@ import React, {
   useState,
 } from "react";
 
-import type { AuthSession } from "../../types/auth";
-import { sessionStorage } from "../../services/session-storage";
+import type { AuthSession, LoginCredentials } from "../../types/auth";
+import type { AuthRepository } from "./auth.repository";
+import { mockAuthRepository } from "./mock-auth.repository";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -16,19 +17,23 @@ interface AuthContextValue {
   session: AuthSession | null;
   status: AuthStatus;
   isAuthenticated: boolean;
-  signIn: (session: AuthSession) => Promise<void>;
+  /** Development-only flag — becomes false when BackendAuthRepository is used */
+  isMockAuth: boolean;
+  login: (credentials: LoginCredentials) => Promise<void>;
   signOut: () => Promise<void>;
+  /** @deprecated use login() */
+  signIn: (session: AuthSession) => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextValue | undefined>(
-  undefined
-);
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export function AuthProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+/**
+ * Swap this when the real tenant-aware backend login is ready:
+ *   const authRepository: AuthRepository = backendAuthRepository;
+ */
+const authRepository: AuthRepository = mockAuthRepository;
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
 
@@ -37,44 +42,38 @@ export function AuthProvider({
 
     async function restoreSession() {
       try {
-        const savedSession = await sessionStorage.get();
-
+        const saved = await authRepository.getSession();
         if (!active) return;
-
-        // Provisional restoration only.
-        // A backend session-validation request must be added
-        // before this is considered production authentication.
-        setSession(savedSession);
-        setStatus(
-          savedSession ? "authenticated" : "unauthenticated"
-        );
+        setSession(saved);
+        setStatus(saved ? "authenticated" : "unauthenticated");
       } catch {
         if (!active) return;
-
         setSession(null);
         setStatus("unauthenticated");
       }
     }
 
     restoreSession();
-
     return () => {
       active = false;
     };
   }, []);
 
-  const signIn = useCallback(async (newSession: AuthSession) => {
-    await sessionStorage.save(newSession);
-
-    setSession(newSession);
+  const login = useCallback(async (credentials: LoginCredentials) => {
+    const next = await authRepository.login(credentials);
+    setSession(next);
     setStatus("authenticated");
   }, []);
 
   const signOut = useCallback(async () => {
-    await sessionStorage.clear();
-
+    await authRepository.logout();
     setSession(null);
     setStatus("unauthenticated");
+  }, []);
+
+  const signIn = useCallback(async (newSession: AuthSession) => {
+    setSession(newSession);
+    setStatus("authenticated");
   }, []);
 
   const value = useMemo(
@@ -82,25 +81,23 @@ export function AuthProvider({
       session,
       status,
       isAuthenticated: status === "authenticated",
-      signIn,
+      isMockAuth: true,
+      login,
       signOut,
+      signIn,
     }),
-    [session, status, signIn, signOut]
+    [session, status, login, signOut, signIn]
   );
 
   return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
   );
 }
 
 export function useAuth() {
   const context = useContext(AuthContext);
-
   if (!context) {
     throw new Error("useAuth must be used inside AuthProvider");
   }
-
   return context;
 }

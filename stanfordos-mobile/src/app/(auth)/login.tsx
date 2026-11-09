@@ -3,25 +3,64 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
+import { Redirect, type Href } from "expo-router";
+
+import { useAuth } from "../../features/auth/AuthContext";
+import { DEMO_LOGIN_HINTS } from "../../features/auth/mock-auth.repository";
+import { ROLE_HOME_ROUTES } from "../../constants/roles";
 
 export default function LoginScreen() {
-  const [tenantCode, setTenantCode] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading] = useState(false);
+  const { login, session, status, isMockAuth } = useAuth();
 
-  function handleLogin() {
-    // Authentication will be connected after the backend
-    // native tenant login contract has been implemented.
-    console.log("Login form submitted");
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showHints, setShowHints] = useState(false);
+
+  if (status === "loading") {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#1D4ED8" />
+      </View>
+    );
+  }
+
+  if (session) {
+    const dest = ROLE_HOME_ROUTES[session.user.role];
+    return <Redirect href={dest as Href} />;
+  }
+
+  async function handleLogin() {
+    setError(null);
+
+    if (!identifier.trim() || !password) {
+      setError("Enter your email and password.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await login({
+        identifier: identifier.trim(),
+        password,
+      });
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : "Sign in failed. Please try again.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -38,7 +77,6 @@ export default function LoginScreen() {
             <View style={styles.logo}>
               <Text style={styles.logoText}>S</Text>
             </View>
-
             <Text style={styles.brandName}>Stanfordos</Text>
             <Text style={styles.brandSubtitle}>
               School management, wherever you are.
@@ -47,42 +85,55 @@ export default function LoginScreen() {
 
           <View style={styles.form}>
             <Text style={styles.heading}>Welcome back</Text>
-
             <Text style={styles.description}>
               Sign in to access your school account.
             </Text>
 
-            <Text style={styles.label}>School code</Text>
-            <TextInput
-              style={styles.input}
-              value={tenantCode}
-              onChangeText={setTenantCode}
-              placeholder="Enter your school code"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            {error ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
 
-            <Text style={styles.label}>Email address</Text>
+            <Text style={styles.label}>Email</Text>
             <TextInput
               style={styles.input}
-              value={email}
-              onChangeText={setEmail}
+              value={identifier}
+              onChangeText={setIdentifier}
               placeholder="name@school.com"
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              autoComplete="email"
+              textContentType="username"
+              editable={!loading}
             />
 
             <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Enter your password"
-              secureTextEntry
-            />
+            <View style={styles.passwordRow}>
+              <TextInput
+                style={[styles.input, styles.passwordInput]}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Enter your password"
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoComplete="password"
+                textContentType="password"
+                editable={!loading}
+              />
+              <Pressable
+                style={styles.toggle}
+                onPress={() => setShowPassword((v) => !v)}
+                hitSlop={8}
+              >
+                <Text style={styles.toggleText}>
+                  {showPassword ? "Hide" : "Show"}
+                </Text>
+              </Pressable>
+            </View>
 
-            <TouchableOpacity
+            <Pressable
               style={[styles.button, loading && styles.buttonDisabled]}
               onPress={handleLogin}
               disabled={loading}
@@ -92,7 +143,38 @@ export default function LoginScreen() {
               ) : (
                 <Text style={styles.buttonText}>Sign in</Text>
               )}
-            </TouchableOpacity>
+            </Pressable>
+
+            {isMockAuth ? (
+              <View style={styles.demoSection}>
+                <Pressable onPress={() => setShowHints((v) => !v)}>
+                  <Text style={styles.demoToggle}>
+                    {showHints ? "Hide demo accounts" : "Show demo accounts"}
+                  </Text>
+                </Pressable>
+
+                {showHints
+                  ? DEMO_LOGIN_HINTS.map((hint) => (
+                      <Pressable
+                        key={hint.email}
+                        style={styles.hintRow}
+                        onPress={() => {
+                          setIdentifier(hint.email);
+                          setPassword(hint.password);
+                          setError(null);
+                        }}
+                      >
+                        <Text style={styles.hintEmail}>{hint.email}</Text>
+                        <Text style={styles.hintRole}>{hint.role}</Text>
+                      </Pressable>
+                    ))
+                  : null}
+
+                <Text style={styles.demoNote}>
+                  Password for all demo accounts: password123
+                </Text>
+              </View>
+            ) : null}
 
             <Text style={styles.footer}>
               Secure access to your school community.
@@ -111,6 +193,12 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
+  },
+  centered: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F8FAFC",
   },
   container: {
     flexGrow: 1,
@@ -162,7 +250,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#64748B",
     marginTop: 8,
-    marginBottom: 28,
+    marginBottom: 24,
+  },
+  errorBox: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: "#B91C1C",
+    fontSize: 13,
+    fontWeight: "600",
   },
   label: {
     fontSize: 13,
@@ -181,6 +282,26 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     backgroundColor: "#FFFFFF",
   },
+  passwordRow: {
+    position: "relative",
+    marginBottom: 20,
+  },
+  passwordInput: {
+    marginBottom: 0,
+    paddingRight: 64,
+  },
+  toggle: {
+    position: "absolute",
+    right: 14,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+  },
+  toggleText: {
+    color: "#1D4ED8",
+    fontSize: 13,
+    fontWeight: "700",
+  },
   button: {
     height: 54,
     backgroundColor: "#1D4ED8",
@@ -196,6 +317,45 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
+  },
+  demoSection: {
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+  },
+  demoToggle: {
+    color: "#1D4ED8",
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  hintRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 10,
+    marginBottom: 6,
+  },
+  hintEmail: {
+    fontSize: 13,
+    color: "#0F172A",
+    fontWeight: "600",
+  },
+  hintRole: {
+    fontSize: 11,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+  demoNote: {
+    marginTop: 8,
+    fontSize: 11,
+    color: "#94A3B8",
+    textAlign: "center",
   },
   footer: {
     textAlign: "center",

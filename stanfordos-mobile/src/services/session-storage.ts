@@ -5,10 +5,7 @@ const SESSION_KEY = "stanfordos_auth_session";
 
 export const sessionStorage = {
   async save(session: AuthSession): Promise<void> {
-    await SecureStore.setItemAsync(
-      SESSION_KEY,
-      JSON.stringify(session)
-    );
+    await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(session));
   },
 
   async get(): Promise<AuthSession | null> {
@@ -30,6 +27,10 @@ export const sessionStorage = {
       ) {
         await this.clear();
         return null;
+      }
+
+      if (!session.tenant) {
+        session.tenant = null;
       }
 
       return session;
