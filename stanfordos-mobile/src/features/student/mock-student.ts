@@ -42,7 +42,8 @@ export interface StudentAssignment {
   myScore?: number | null;
   mySubmissionText?: string | null;
   submittedAt?: string | null;
-  teacherFeedback?: string;
+  myAttachment?: StudentSubmissionAttachment | null;
+  teacherFeedback?: string | null;
   submissionHistory?: StudentSubmissionAttempt[];
 }
 
@@ -316,10 +317,6 @@ export const mockStudentService = {
     return TIMETABLE.map((s) => ({ ...s }));
   },
 
-  async listAssignments(): Promise<StudentAssignment[]> {
-    await delay(400);
-    return ASSIGNMENTS.map((a) => ({ ...a }));
-  },
 
   async listAssignments(): Promise<StudentAssignment[]> {
     await delay(400);
