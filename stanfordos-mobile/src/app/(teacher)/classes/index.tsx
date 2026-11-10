@@ -22,7 +22,7 @@ export default function TeacherClassesScreen() {
     setError(null);
     setLoading(true);
     try {
-      setClasses(await mockClassesService.listMyClasses());
+      setClasses(await classesService.listMyClasses());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load classes.");
     } finally {

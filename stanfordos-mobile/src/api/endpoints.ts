@@ -87,6 +87,12 @@ export const API_ENDPOINTS = {
 
     MARK_ALL_READ: "/api/notifications/mark-all-read",
   },
+  ANNOUNCEMENTS: {
+    CREATE: "/api/announcements",
+    SCHOOL_WIDE_FOR_ME: "/api/announcements/school-wide/for-me",
+    BY_COURSE: (courseId: string | number) =>
+      `/api/announcements/course/${courseId}`,
+  },
 
   LMS: {
     COURSES: "/api/courses",
@@ -103,5 +109,8 @@ export const API_ENDPOINTS = {
 
     MY_SUBMISSION: (assignmentId: string | number) =>
       `/api/assignments/${assignmentId}/submissions/me`,
+
+    GRADE_SUBMISSION: (submissionId: string | number) =>
+      `/api/submissions/${submissionId}/grade`,
   },
 } as const;

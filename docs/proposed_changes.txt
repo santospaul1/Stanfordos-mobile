@@ -1,0 +1,221 @@
+# Stanfordos Mobile — Spring Boot Backend Change Register
+
+**Status:** Proposed changes only  
+**Implementation policy:** No backend changes are authorized in the current mobile development phase.  
+**Purpose:** Record backend work for review and agreement with the backend colleague before implementation.
+
+## 1. Native mobile authentication and tenant resolution
+
+**Priority:** Critical — required before production mobile authentication.
+
+### Current concern
+The existing web authentication flow derives school/tenant context from the HTTP `Origin` header. A native mobile application does not have a reliable school website origin to supply. The mobile client must not spoof `Origin` or be allowed to choose an arbitrary school ID.
+
+### Proposed backend work
+- Add a native authentication flow that verifies credentials first.
+- Resolve the authenticated user's school memberships and roles on the server.
+- Return the authorized school contexts available to that user.
+- If the user belongs to multiple schools, allow school selection only from the memberships returned by the server.
+- Validate the selected school membership before issuing a school-scoped access token or session.
+- Preserve platform-wide context for `PLATFORM_ADMIN`.
+- Ensure access-token refresh preserves the validated school and role context.
+- Keep role names consistent: `ADMIN`, `TEACHER`, `STUDENT`, `PARENT`, `LIBRARIAN`, `ACCOUNTANT`, `PLATFORM_ADMIN`.
+
+### Acceptance criteria
+- A user cannot authenticate into a school where they have no membership.
+- The mobile client cannot change its school context by submitting an arbitrary school ID.
+- Users with multiple memberships can select only an authorized membership.
+- Platform administrators retain platform-wide access according to existing policy.
+- Refreshing a token does not silently change the user's school or role.
+
+## 2. Attendance access for assigned subject teachers
+
+**Priority:** High — security and functionality.
+
+### Current concern
+The existing class-section ownership check allows administrators and homeroom teachers. A subject teacher may have a valid teaching assignment for a class but still be denied access to its attendance functions.
+
+### Proposed backend work
+- Add an authorization path for teachers assigned to the requested class section.
+- Retain existing administrator and homeroom-teacher permissions.
+- Apply the same authorization rule consistently to:
+  - Attendance entry-sheet retrieval.
+  - Attendance submission/marking.
+  - Attendance session listing.
+- Verify every submitted student belongs to the selected class section.
+- Reject cross-school class and student IDs without disclosing records from another school.
+
+### Possible implementation direction
+Add a repository lookup equivalent to:
+
+`existsByClassSectionIdAndTeacherId(classSectionId, teacherId)`
+
+The exact property names and repository method must be checked against the actual entities before implementation.
+
+### Acceptance criteria
+- An assigned subject teacher can access attendance for their assigned class.
+- An unassigned teacher cannot access that class's attendance.
+- Administrators and authorized homeroom teachers retain their access.
+- A request containing a student from another class is rejected.
+- Cross-school access is rejected.
+
+## 3. Course announcement authorization
+
+**Priority:** High — authorization and data isolation.
+
+### Current concern
+The course announcement listing path should enforce course ownership and school context. A course ID supplied by a client must not be sufficient to read announcements for a course the current user is not authorized to access.
+
+### Proposed backend work
+- Add a school-context and course-access check to course announcement listing.
+- For teacher access, verify that the teacher owns the course or has an explicitly permitted teaching assignment.
+- Preserve the intended administrator access rules.
+- Add appropriate controller-level role restrictions to course announcement creation and listing.
+- Keep school-wide announcement permissions separate from course-specific permissions.
+- Review the `listByCourse()` service path and its repository query.
+
+### Acceptance criteria
+- Teachers can access announcements only for courses they are authorized to manage.
+- Students can access only announcements intended for their enrolled courses, subject to the agreed audience rules.
+- Administrators retain the intended school-level access.
+- Cross-school course IDs do not expose announcements.
+- School-wide announcement creation remains restricted to the intended administrative roles.
+
+## 4. Student assignment discovery and detail access
+
+**Priority:** High — required for live student assignment screens.
+
+### Current concern
+The current course assignment listing and assignment detail service paths use teacher course-ownership checks. The student app cannot safely use those paths to discover assignments for a student's enrolled courses.
+
+The current `GET /api/courses` response is school-scoped, but it is not a student-enrollment-filtered course list.
+
+### Proposed backend work
+Introduce student-specific read endpoints. Suggested routes:
+
+- `GET /api/students/me/assignments`
+- `GET /api/students/me/assignments/{assignmentId}`
+
+The exact route names can be agreed with the backend team.
+
+The service should:
+- Resolve the student from the authenticated identity.
+- Retrieve the student's active course enrollments.
+- Return assignments only for those enrolled courses.
+- Verify the assignment belongs to the current school.
+- Return the student's own submission, if one exists.
+- Return grade and feedback only for that student's submission.
+- Avoid returning other students' submission data.
+- Define how dropped or inactive enrollments affect historical assignment visibility.
+
+### Acceptance criteria
+- Students see assignments only for courses in which they are enrolled.
+- Students cannot retrieve another student's submission or grade.
+- Students cannot access assignments from another school.
+- An assignment with no submission is still visible to an enrolled student.
+- The response clearly distinguishes an assignment with no submission from a missing or inaccessible assignment.
+
+## 5. Student submission and grading integrity
+
+**Priority:** High — data integrity.
+
+### Existing behavior to preserve
+The existing submission service checks course enrollment before accepting a submission and upserts by assignment/student. The existing multipart submission endpoint supports text and file content.
+
+### Proposed backend work
+- Verify that `getMySubmission()` checks assignment school context and student enrollment before returning a record.
+- Keep student identity server-derived; do not accept a student ID from the mobile request as the authority for submission ownership.
+- Confirm whether resubmission is permitted after the due date and after grading.
+- Define whether a graded submission can be edited or resubmitted.
+- Validate submitted content according to the agreed text/file rules.
+- Preserve the existing per-assignment/per-student uniqueness constraint.
+- Validate uploaded file size, type, storage permissions, and presigned URL access.
+- Ensure presigned URLs are scoped and expire appropriately.
+
+### Grade maximum validation
+The current grading service should reject a grade above the assignment's `maxScore`.
+
+Suggested validation:
+- If `maxScore` is configured, reject `grade > maxScore`.
+- Retain the existing non-negative grade validation.
+- Return a clear validation response to the teacher app.
+- Add automated tests for boundary values.
+
+### Acceptance criteria
+- A student cannot submit on behalf of another student.
+- A student cannot submit to a course in which they are not enrolled.
+- A student cannot retrieve another student's submission.
+- A grade cannot be negative or exceed the assignment maximum.
+- Duplicate submission attempts follow the agreed upsert/resubmission policy.
+- File access does not expose private storage locations or permanent public URLs.
+
+## 6. Assignment and submission API contract
+
+**Priority:** Medium — integration consistency.
+
+### Proposed work
+Document and test the API contract consumed by mobile:
+
+- Assignment fields: `id`, `courseId`, `courseTitle`, `title`, `description`, `dueDate`, `maxScore`, `createdAt`.
+- Submission fields: `id`, `assignmentId`, `studentId`, `studentName`, `textContent`, `fileUrl`, `submittedAt`, `grade`, `feedback`, `gradedAt`.
+- Define nullability for optional fields.
+- Define the response when a student has not submitted.
+- Define consistent error responses for forbidden, not found, validation failure, and expired authentication.
+- Confirm whether file submissions and text-only submissions are both accepted.
+- Keep API documentation/OpenAPI definitions synchronized with the implementation.
+
+## 7. Timetable integration
+
+**Priority:** Medium — verify contract; no new endpoint proposed at this stage.
+
+The existing `GET /api/timetable/me` endpoint already provides timetable data with periods and slots.
+
+Mobile needs the backend response to preserve:
+- Class section identity and name.
+- Period IDs, names, start and end times.
+- Break-period indicators.
+- Slot day, period ID, subject, teacher, room, and class information.
+
+The mobile app can join slots to periods using `periodId`. Break periods should not be rendered as teaching lessons.
+
+**Backend change:** No new change is proposed unless testing reveals missing or incorrect timetable data.
+
+## 8. General security and regression tests
+
+Before any proposed backend changes are approved, add tests for:
+
+- Cross-school access to classes, courses, assignments, announcements, students, and submissions.
+- Role-based authorization for every affected endpoint.
+- Student enrollment restrictions.
+- Teacher course ownership and teaching assignment permissions.
+- Invalid student IDs in attendance requests.
+- Grade values below zero and above the assignment maximum.
+- Submission resubmission and grading lifecycle.
+- File upload validation and presigned URL access.
+- Native authentication with one and multiple school memberships.
+- Token refresh and school-context integrity.
+
+## 9. Implementation order for backend review
+
+| Order | Change | Reason |
+|---|---|---|
+| 1 | Native mobile authentication and tenant resolution | Required for secure live mobile access |
+| 2 | Student assignment discovery and detail endpoints | Required for student live assignment screens |
+| 3 | Submission ownership and grade validation | Protects student work and grading integrity |
+| 4 | Attendance access for assigned subject teachers | Fixes legitimate teacher access while preserving class isolation |
+| 5 | Course announcement authorization | Prevents unauthorized course announcement access |
+| 6 | API contract and regression tests | Prevents integration regressions |
+
+## 10. Scope boundary and implementation record
+
+This document records proposals for technical discussion. It does not mean any backend code has been changed.
+
+For the current mobile development phase:
+- Continue working in the Expo/React Native repository only.
+- Keep mock authentication and mock data enabled unless explicitly testing a supported live endpoint.
+- Do not call teacher-only assignment endpoints from student screens.
+- Do not invent backend routes or assume proposed endpoints already exist.
+- Keep backend integration points isolated behind mobile service modules.
+- Revisit this register with the backend colleague before scheduling backend implementation.
+
+**Backend status:** No changes made as part of this mobile phase.

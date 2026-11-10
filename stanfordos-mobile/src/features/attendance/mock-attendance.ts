@@ -154,8 +154,13 @@ export const mockAttendanceService = {
   },
 };
 
-export function cycleStatus(current: AttendanceStatus): AttendanceStatus {
+export function cycleStatus(
+  current: AttendanceStatus | null,
+): AttendanceStatus {
+  if (current === null) return "PRESENT";
+
   const order: AttendanceStatus[] = ["PRESENT", "LATE", "ABSENT", "EXCUSED"];
+
   const idx = order.indexOf(current);
   return order[(idx + 1) % order.length];
 }

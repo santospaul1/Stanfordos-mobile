@@ -1,11 +1,7 @@
-import React from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { classesService } from "../classes/classes.service";
+import type { TeacherClassSummary } from "../classes/types";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, type Href } from "expo-router";
 
@@ -98,12 +94,36 @@ const DASHBOARD_CONTENT: Record<UserRole, DashboardConfig> = {
       { label: "Attendance today", value: "94%" },
     ],
     modules: [
-      { id: "students", title: "Students", description: "Profiles, enrollment and records" },
-      { id: "teachers", title: "Teachers", description: "Staff directory and assignments" },
-      { id: "classes", title: "Classes & sections", description: "Streams, subjects and terms" },
-      { id: "attendance", title: "Attendance", description: "Daily tracking and reports" },
-      { id: "fees", title: "Fees", description: "Invoices, balances and payments" },
-      { id: "reports", title: "Reports", description: "Academic and operational insights" },
+      {
+        id: "students",
+        title: "Students",
+        description: "Profiles, enrollment and records",
+      },
+      {
+        id: "teachers",
+        title: "Teachers",
+        description: "Staff directory and assignments",
+      },
+      {
+        id: "classes",
+        title: "Classes & sections",
+        description: "Streams, subjects and terms",
+      },
+      {
+        id: "attendance",
+        title: "Attendance",
+        description: "Daily tracking and reports",
+      },
+      {
+        id: "fees",
+        title: "Fees",
+        description: "Invoices, balances and payments",
+      },
+      {
+        id: "reports",
+        title: "Reports",
+        description: "Academic and operational insights",
+      },
     ],
   },
   TEACHER: {
@@ -117,11 +137,31 @@ const DASHBOARD_CONTENT: Record<UserRole, DashboardConfig> = {
     ],
     modules: [
       { id: "classes", title: "My classes", description: "Sections you teach" },
-      { id: "attendance", title: "Attendance", description: "Take and review attendance" },
-      { id: "marks", title: "Marks entry", description: "Record exam and continuous scores" },
-      { id: "assignments", title: "Assignments", description: "Create, grade and feedback" },
-      { id: "timetable", title: "Timetable", description: "Your weekly schedule" },
-      { id: "announcements", title: "Announcements", description: "Post to your classes" },
+      {
+        id: "attendance",
+        title: "Attendance",
+        description: "Take and review attendance",
+      },
+      {
+        id: "marks",
+        title: "Marks entry",
+        description: "Record exam and continuous scores",
+      },
+      {
+        id: "assignments",
+        title: "Assignments",
+        description: "Create, grade and feedback",
+      },
+      {
+        id: "timetable",
+        title: "Timetable",
+        description: "Your weekly schedule",
+      },
+      {
+        id: "announcements",
+        title: "Announcements",
+        description: "Post to your classes",
+      },
     ],
   },
   STUDENT: {
@@ -134,12 +174,36 @@ const DASHBOARD_CONTENT: Record<UserRole, DashboardConfig> = {
       { label: "Fee balance", value: "KSh 0" },
     ],
     modules: [
-      { id: "timetable", title: "Timetable", description: "This week's classes" },
-      { id: "assignments", title: "Assignments", description: "Submit and track work" },
-      { id: "results", title: "Results", description: "Marks and report cards" },
-      { id: "attendance", title: "Attendance", description: "Your attendance history" },
-      { id: "fees", title: "Fees", description: "Invoices and payment history" },
-      { id: "library", title: "Library", description: "Borrowed books and due dates" },
+      {
+        id: "timetable",
+        title: "Timetable",
+        description: "This week's classes",
+      },
+      {
+        id: "assignments",
+        title: "Assignments",
+        description: "Submit and track work",
+      },
+      {
+        id: "results",
+        title: "Results",
+        description: "Marks and report cards",
+      },
+      {
+        id: "attendance",
+        title: "Attendance",
+        description: "Your attendance history",
+      },
+      {
+        id: "fees",
+        title: "Fees",
+        description: "Invoices and payment history",
+      },
+      {
+        id: "library",
+        title: "Library",
+        description: "Borrowed books and due dates",
+      },
     ],
   },
   PARENT: {
@@ -152,12 +216,32 @@ const DASHBOARD_CONTENT: Record<UserRole, DashboardConfig> = {
       { label: "New notices", value: "3" },
     ],
     modules: [
-      { id: "children", title: "My children", description: "Switch and view profiles" },
-      { id: "attendance", title: "Attendance", description: "Daily and term summaries" },
-      { id: "academics", title: "Academic performance", description: "Marks and report cards" },
+      {
+        id: "children",
+        title: "My children",
+        description: "Switch and view profiles",
+      },
+      {
+        id: "attendance",
+        title: "Attendance",
+        description: "Daily and term summaries",
+      },
+      {
+        id: "academics",
+        title: "Academic performance",
+        description: "Marks and report cards",
+      },
       { id: "fees", title: "Fees", description: "Balances and receipts" },
-      { id: "notifications", title: "Notifications", description: "School and class updates" },
-      { id: "messages", title: "Messages", description: "Contact teachers (coming soon)" },
+      {
+        id: "notifications",
+        title: "Notifications",
+        description: "School and class updates",
+      },
+      {
+        id: "messages",
+        title: "Messages",
+        description: "Contact teachers (coming soon)",
+      },
     ],
   },
   LIBRARIAN: {
@@ -170,12 +254,36 @@ const DASHBOARD_CONTENT: Record<UserRole, DashboardConfig> = {
       { label: "Returns today", value: "14" },
     ],
     modules: [
-      { id: "catalogue", title: "Book catalogue", description: "Search and manage titles" },
-      { id: "borrowing", title: "Borrowing", description: "Issue books to students" },
-      { id: "returns", title: "Returns", description: "Check-in and clear loans" },
-      { id: "inventory", title: "Inventory", description: "Copies and stock levels" },
-      { id: "history", title: "Loan history", description: "By student or title" },
-      { id: "reports", title: "Library reports", description: "Usage and overdue lists" },
+      {
+        id: "catalogue",
+        title: "Book catalogue",
+        description: "Search and manage titles",
+      },
+      {
+        id: "borrowing",
+        title: "Borrowing",
+        description: "Issue books to students",
+      },
+      {
+        id: "returns",
+        title: "Returns",
+        description: "Check-in and clear loans",
+      },
+      {
+        id: "inventory",
+        title: "Inventory",
+        description: "Copies and stock levels",
+      },
+      {
+        id: "history",
+        title: "Loan history",
+        description: "By student or title",
+      },
+      {
+        id: "reports",
+        title: "Library reports",
+        description: "Usage and overdue lists",
+      },
     ],
   },
   ACCOUNTANT: {
@@ -188,12 +296,36 @@ const DASHBOARD_CONTENT: Record<UserRole, DashboardConfig> = {
       { label: "Payments today", value: "38" },
     ],
     modules: [
-      { id: "invoices", title: "Fee invoices", description: "Generate and manage invoices" },
-      { id: "payments", title: "Payments", description: "Record and reconcile payments" },
-      { id: "balances", title: "Outstanding balances", description: "Follow up on arrears" },
-      { id: "receipts", title: "Receipts", description: "Download and share receipts" },
-      { id: "items", title: "Fee items", description: "Configure fee structure" },
-      { id: "reports", title: "Financial reports", description: "Term and year summaries" },
+      {
+        id: "invoices",
+        title: "Fee invoices",
+        description: "Generate and manage invoices",
+      },
+      {
+        id: "payments",
+        title: "Payments",
+        description: "Record and reconcile payments",
+      },
+      {
+        id: "balances",
+        title: "Outstanding balances",
+        description: "Follow up on arrears",
+      },
+      {
+        id: "receipts",
+        title: "Receipts",
+        description: "Download and share receipts",
+      },
+      {
+        id: "items",
+        title: "Fee items",
+        description: "Configure fee structure",
+      },
+      {
+        id: "reports",
+        title: "Financial reports",
+        description: "Term and year summaries",
+      },
     ],
   },
   PLATFORM_ADMIN: {
@@ -206,12 +338,36 @@ const DASHBOARD_CONTENT: Record<UserRole, DashboardConfig> = {
       { label: "Open tickets", value: "7" },
     ],
     modules: [
-      { id: "schools", title: "Schools", description: "Onboard and manage tenants" },
-      { id: "users", title: "Platform users", description: "Cross-tenant administrators" },
-      { id: "subscriptions", title: "Subscriptions", description: "Plans and billing status" },
-      { id: "analytics", title: "Platform analytics", description: "Usage and growth" },
-      { id: "system", title: "System admin", description: "Health, jobs and config" },
-      { id: "support", title: "Support", description: "Tickets and announcements" },
+      {
+        id: "schools",
+        title: "Schools",
+        description: "Onboard and manage tenants",
+      },
+      {
+        id: "users",
+        title: "Platform users",
+        description: "Cross-tenant administrators",
+      },
+      {
+        id: "subscriptions",
+        title: "Subscriptions",
+        description: "Plans and billing status",
+      },
+      {
+        id: "analytics",
+        title: "Platform analytics",
+        description: "Usage and growth",
+      },
+      {
+        id: "system",
+        title: "System admin",
+        description: "Health, jobs and config",
+      },
+      {
+        id: "support",
+        title: "Support",
+        description: "Tickets and announcements",
+      },
     ],
   },
 };
@@ -224,6 +380,75 @@ export function RoleDashboard({ role }: Props) {
   const { session, signOut, isMockAuth } = useAuth();
   const insets = useSafeAreaInsets();
   const content = DASHBOARD_CONTENT[role];
+  const [teacherClasses, setTeacherClasses] = useState<TeacherClassSummary[]>(
+    [],
+  );
+  const [teacherClassesLoading, setTeacherClassesLoading] = useState(false);
+  const [teacherClassesError, setTeacherClassesError] = useState<string | null>(
+    null,
+  );
+
+  const loadTeacherClasses = useCallback(async () => {
+    setTeacherClassesLoading(true);
+    setTeacherClassesError(null);
+
+    try {
+      const result = await classesService.listMyClasses();
+      setTeacherClasses(result);
+    } catch (error) {
+      setTeacherClassesError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load your teaching assignments.",
+      );
+    } finally {
+      setTeacherClassesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (role === "TEACHER") {
+      void loadTeacherClasses();
+    }
+  }, [role, loadTeacherClasses]);
+
+  // Each class is grouped by section in classesService.
+  // Count distinct subjects rather than counting each subject assignment as a class.
+  const teacherSubjectCount = new Set(
+    teacherClasses.flatMap((item) =>
+      item.subjectName
+        .split(",")
+        .map((subject) => subject.trim())
+        .filter(Boolean),
+    ),
+  ).size;
+
+  const teacherStudentCount = teacherClasses.reduce(
+    (total, item) => total + item.studentCount,
+    0,
+  );
+
+  const displayedStats =
+    role === "TEACHER"
+      ? [
+          {
+            label: "My classes",
+            value: teacherClassesLoading ? "—" : String(teacherClasses.length),
+          },
+          {
+            label: "Subjects",
+            value: teacherClassesLoading ? "—" : String(teacherSubjectCount),
+          },
+          {
+            label: "Students across classes",
+            value: teacherClassesLoading ? "—" : String(teacherStudentCount),
+          },
+          {
+            label: "Data source",
+            value: isMockAuth ? "Demo" : "School",
+          },
+        ]
+      : content.stats;
 
   return (
     <ScrollView
@@ -256,14 +481,76 @@ export function RoleDashboard({ role }: Props) {
       </View>
 
       <View style={styles.statsGrid}>
-        {content.stats.map((stat) => (
+        {displayedStats.map((stat) => (
           <View key={stat.label} style={styles.statCard}>
             <Text style={styles.statValue}>{stat.value}</Text>
             <Text style={styles.statLabel}>{stat.label}</Text>
           </View>
         ))}
       </View>
+      {role === "TEACHER" && (
+        <View style={styles.teacherClassesSection}>
+          <View style={styles.teacherClassesHeader}>
+            <Text style={styles.sectionTitle}>Your teaching assignments</Text>
 
+            <Pressable
+              onPress={() => router.push("/(teacher)/classes" as Href)}
+              accessibilityRole="button"
+            >
+              <Text style={styles.viewAllText}>View all</Text>
+            </Pressable>
+          </View>
+
+          {teacherClassesLoading ? (
+            <Text style={styles.dashboardHint}>Loading your classes...</Text>
+          ) : teacherClassesError ? (
+            <View style={styles.dashboardError}>
+              <Text style={styles.dashboardErrorText}>
+                {teacherClassesError}
+              </Text>
+
+              <Pressable onPress={() => void loadTeacherClasses()}>
+                <Text style={styles.retryText}>Try again</Text>
+              </Pressable>
+            </View>
+          ) : teacherClasses.length === 0 ? (
+            <Text style={styles.dashboardHint}>
+              No teaching assignments were returned for this account.
+            </Text>
+          ) : (
+            <View style={styles.teacherClassList}>
+              {teacherClasses.slice(0, 4).map((item) => (
+                <Pressable
+                  key={item.id}
+                  style={styles.teacherClassCard}
+                  onPress={() =>
+                    router.push(`/(teacher)/classes/${item.id}` as Href)
+                  }
+                >
+                  <View style={styles.teacherClassInfo}>
+                    <Text style={styles.teacherClassName}>{item.name}</Text>
+                    <Text style={styles.teacherClassSubjects}>
+                      {item.subjectName || "Subject not specified"}
+                    </Text>
+                    <Text style={styles.teacherClassMeta}>
+                      {item.gradeLevelName || "Class section"}
+                    </Text>
+                  </View>
+
+                  <View style={styles.teacherClassCount}>
+                    <Text style={styles.teacherClassCountValue}>
+                      {item.studentCount}
+                    </Text>
+                    <Text style={styles.teacherClassCountLabel}>Students</Text>
+                  </View>
+
+                  <Text style={styles.chevron}>›</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
       <Text style={styles.sectionTitle}>Modules</Text>
 
       <View style={styles.moduleList}>
@@ -282,9 +569,7 @@ export function RoleDashboard({ role }: Props) {
             }}
           >
             <View style={styles.moduleIcon}>
-              <Text style={styles.moduleInitial}>
-                {module.title.charAt(0)}
-              </Text>
+              <Text style={styles.moduleInitial}>{module.title.charAt(0)}</Text>
             </View>
             <View style={styles.moduleTextContainer}>
               <Text style={styles.moduleTitle}>{module.title}</Text>
@@ -461,5 +746,102 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     textAlign: "center",
+  },
+  teacherClassesSection: {
+    marginBottom: 28,
+  },
+
+  teacherClassesHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  viewAllText: {
+    color: "#1D4ED8",
+    fontSize: 13,
+    fontWeight: "700",
+    marginBottom: 12,
+  },
+
+  teacherClassList: {
+    gap: 10,
+  },
+
+  teacherClassCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    padding: 14,
+  },
+
+  teacherClassInfo: {
+    flex: 1,
+    paddingRight: 8,
+  },
+
+  teacherClassName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+
+  teacherClassSubjects: {
+    fontSize: 13,
+    color: "#475569",
+    marginTop: 4,
+  },
+
+  teacherClassMeta: {
+    fontSize: 11,
+    color: "#94A3B8",
+    marginTop: 3,
+  },
+
+  teacherClassCount: {
+    alignItems: "center",
+    marginRight: 12,
+  },
+
+  teacherClassCountValue: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#1D4ED8",
+  },
+
+  teacherClassCountLabel: {
+    fontSize: 10,
+    color: "#64748B",
+  },
+
+  dashboardHint: {
+    color: "#64748B",
+    fontSize: 13,
+    lineHeight: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 14,
+  },
+
+  dashboardError: {
+    backgroundColor: "#FEF2F2",
+    borderRadius: 12,
+    padding: 14,
+  },
+
+  dashboardErrorText: {
+    color: "#B91C1C",
+    fontSize: 13,
+    lineHeight: 19,
+  },
+
+  retryText: {
+    color: "#1D4ED8",
+    fontWeight: "700",
+    fontSize: 13,
+    marginTop: 10,
   },
 });

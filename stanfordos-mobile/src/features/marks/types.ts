@@ -11,7 +11,8 @@ export interface SubjectOption {
 }
 
 export interface MarksClassOption {
-  id: string;
+  id: string; // Unique class + subject selection key
+  classSectionId?: string;
   name: string;
   gradeLevelName: string;
   subjectId: string;

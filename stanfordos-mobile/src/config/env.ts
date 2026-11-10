@@ -1,12 +1,3 @@
-/**
- * Public environment configuration.
- * Never put secrets in EXPO_PUBLIC_* variables.
- *
- * EXPO_PUBLIC_API_URL=https://your-api-domain.com
- * EXPO_PUBLIC_USE_MOCK_AUTH=true
- * EXPO_PUBLIC_USE_MOCK_DATA=false
- */
-
 function flag(name: string, fallback: boolean): boolean {
   const raw = process.env[name];
 
@@ -18,19 +9,16 @@ function flag(name: string, fallback: boolean): boolean {
 }
 
 function normalizeApiUrl(value: string): string {
-  // API_ENDPOINTS already contains /api/... paths.
-  // Remove a trailing /api to prevent /api/api/... requests.
   return value
     .trim()
     .replace(/\/+$/, "")
     .replace(/\/api$/i, "");
 }
 
-const rawApiUrl =
-  process.env.EXPO_PUBLIC_API_URL ?? "https://your-api-domain.com";
-
 export const ENV = {
-  API_URL: normalizeApiUrl(rawApiUrl),
+  API_URL: normalizeApiUrl(
+    process.env.EXPO_PUBLIC_API_URL ?? "https://stanfordos.co.ke",
+  ),
 
   APP_NAME: process.env.EXPO_PUBLIC_APP_NAME ?? "Stanfordos",
 

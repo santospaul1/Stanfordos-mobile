@@ -10,10 +10,9 @@ import { router, useFocusEffect } from "expo-router";
 
 import { Screen, Card, EmptyState, ErrorBanner } from "../../../components/ui";
 import { Brand } from "../../../constants/brand";
-import {
-  WEEKDAYS,
-  mockTimetableService,
-} from "../../../features/timetable/mock-timetable";
+import { WEEKDAYS } from "../../../features/timetable/mock-timetable";
+import { timetableService } from "../../../features/timetable/timetable.service";
+
 import type { TimetableSlot, Weekday } from "../../../features/timetable/types";
 
 function todayKey(): Weekday {
@@ -33,7 +32,7 @@ export default function TeacherTimetableScreen() {
     setError(null);
     setLoading(true);
     try {
-      setSlots(await mockTimetableService.getMyWeek());
+      setSlots(await timetableService.getMyWeek());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load timetable.");
     } finally {

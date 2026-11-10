@@ -10,7 +10,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 
 import { Screen, Card, EmptyState, ErrorBanner } from "../../../components/ui";
 import { Brand } from "../../../constants/brand";
-import { mockClassesService } from "../../../features/classes/mock-classes";
+import { classesService } from "../../../features/classes/classes.service";
 import type {
   TeacherClassStudent,
   TeacherClassSummary,
@@ -24,13 +24,30 @@ export default function TeacherClassDetailScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!classSectionId) return;
+    if (!classSectionId) {
+      setLoading(false);
+      setError("Missing class id.");
+      return;
+    }
+
     setError(null);
     setLoading(true);
+
     try {
-      const summary = mockClassesService.getClass(classSectionId) ?? null;
-      setCls(summary);
-      setStudents(await mockClassesService.getClassStudents(classSectionId));
+      const [classList, roster] = await Promise.all([
+        classesService.listMyClasses(),
+        classesService.getClassStudents(classSectionId),
+      ]);
+
+      const selectedClass =
+        classList.find((item) => item.id === classSectionId) ?? null;
+
+      setCls(selectedClass);
+      setStudents(roster);
+
+      if (!selectedClass) {
+        setError("This class is not assigned to your account.");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load class.");
     } finally {
@@ -41,7 +58,7 @@ export default function TeacherClassDetailScreen() {
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load])
+    }, [load]),
   );
 
   return (
@@ -74,9 +91,7 @@ export default function TeacherClassDetailScreen() {
                 <Text style={styles.name}>{s.fullName}</Text>
                 <Text style={styles.meta}>{s.admissionNumber}</Text>
               </View>
-              {s.gender ? (
-                <Text style={styles.gender}>{s.gender}</Text>
-              ) : null}
+              {s.gender ? <Text style={styles.gender}>{s.gender}</Text> : null}
             </Card>
           ))}
         </View>
@@ -87,7 +102,12 @@ export default function TeacherClassDetailScreen() {
 
 const styles = StyleSheet.create({
   header: { marginBottom: 20 },
-  back: { color: Brand.primary, fontSize: 16, fontWeight: "700", marginBottom: 12 },
+  back: {
+    color: Brand.primary,
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 12,
+  },
   title: { fontSize: 24, fontWeight: "800", color: Brand.text },
   subtitle: { marginTop: 4, fontSize: 14, color: Brand.textSecondary },
   center: { paddingVertical: 48, alignItems: "center" },

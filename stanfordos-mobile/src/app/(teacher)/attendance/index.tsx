@@ -10,9 +10,7 @@ import { router, useFocusEffect } from "expo-router";
 
 import { Screen, Card, EmptyState, ErrorBanner, SearchBar } from "../../../components/ui";
 import { Brand } from "../../../constants/brand";
-import {
-  mockAttendanceService,
-} from "../../../features/attendance/mock-attendance";
+import { attendanceService } from "../../../features/attendance/attendance.service";
 import type { ClassSectionSummary } from "../../../features/attendance/types";
 
 export default function TeacherAttendanceClassesScreen() {
@@ -25,7 +23,7 @@ export default function TeacherAttendanceClassesScreen() {
     setError(null);
     setLoading(true);
     try {
-      const data = await mockAttendanceService.listMyClasses();
+      const data = await attendanceService.listMyClasses();
       setClasses(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load classes.");

@@ -17,11 +17,14 @@ import {
   ErrorBanner,
 } from "../../../components/ui";
 import { Brand, AttendanceStatusColors } from "../../../constants/brand";
+
 import {
   cycleStatus,
-  mockAttendanceService,
   todayIso,
 } from "../../../features/attendance/mock-attendance";
+import { attendanceService } from "../../../features/attendance/attendance.service";
+
+
 import type {
   AttendanceEntrySheet,
   AttendanceStatus,
@@ -48,7 +51,7 @@ export default function AttendanceEntryScreen() {
     setSavedMessage(null);
     setLoading(true);
     try {
-      const data = await mockAttendanceService.getEntrySheet(
+      const data = await attendanceService.getEntrySheet(
         classSectionId,
         date
       );
@@ -66,19 +69,31 @@ export default function AttendanceEntryScreen() {
     }, [load])
   );
 
-  const summary = useMemo(() => {
-    if (!sheet) return null;
-    const counts: Record<AttendanceStatus, number> = {
-      PRESENT: 0,
-      ABSENT: 0,
-      LATE: 0,
-      EXCUSED: 0,
-    };
-    for (const row of sheet.rows) {
+
+
+const summary = useMemo(() => {
+  if (!sheet) return null;
+
+  const counts = {
+    PRESENT: 0,
+    ABSENT: 0,
+    LATE: 0,
+    EXCUSED: 0,
+    UNMARKED: 0,
+  };
+
+  for (const row of sheet.rows) {
+    if (row.status == null) {
+      counts.UNMARKED += 1;
+    } else {
       counts[row.status] += 1;
     }
-    return counts;
-  }, [sheet]);
+  }
+
+  return counts;
+}, [sheet]);
+
+
 
   function setStatus(studentId: string, status: AttendanceStatus) {
     setSheet((prev) => {
@@ -93,9 +108,10 @@ export default function AttendanceEntryScreen() {
     setSavedMessage(null);
   }
 
-  function toggleStatus(studentId: string, current: AttendanceStatus) {
-    setStatus(studentId, cycleStatus(current));
-  }
+function toggleStatus(studentId: string, current: AttendanceStatus | null) {
+  // An unmarked student starts at PRESENT on the first tap.
+  setStatus(studentId, current == null ? "PRESENT" : cycleStatus(current));
+}
 
   function markAllPresent() {
     setSheet((prev) => {
@@ -115,7 +131,7 @@ export default function AttendanceEntryScreen() {
     setSaving(true);
     try {
       requireOnline();
-      await mockAttendanceService.saveEntrySheet(sheet);
+      await attendanceService.saveEntrySheet(sheet);
       setSavedMessage("Attendance saved successfully.");
     } catch (e) {
       setError(
@@ -163,8 +179,17 @@ export default function AttendanceEntryScreen() {
         <>
           {summary ? (
             <View style={styles.summaryRow}>
-              {(Object.keys(summary) as AttendanceStatus[]).map((key) => {
-                const colors = AttendanceStatusColors[key];
+              {(
+                ["PRESENT", "ABSENT", "LATE", "EXCUSED", "UNMARKED"] as const
+              ).map((key) => {
+                const colors =
+                  key === "UNMARKED"
+                    ? {
+                        label: "Unmarked",
+                        text: Brand.textMuted,
+                      }
+                    : AttendanceStatusColors[key];
+
                 return (
                   <View key={key} style={styles.summaryItem}>
                     <Text style={styles.summaryValue}>{summary[key]}</Text>
@@ -187,12 +212,18 @@ export default function AttendanceEntryScreen() {
           </View>
 
           <Text style={styles.hint}>
-            Tap a student to cycle Present → Late → Absent → Excused.
+            Tap an unmarked student to set Present. Tap again to cycle Present →
+            Late → Absent → Excused.
           </Text>
-
           <View style={styles.list}>
             {sheet.rows.map((row) => {
-              const colors = AttendanceStatusColors[row.status];
+              const colors = row.status
+                ? AttendanceStatusColors[row.status]
+                : {
+                    label: "Not marked",
+                    bg: "#F1F5F9",
+                    text: "#64748B",
+                  };
               return (
                 <Card
                   key={row.studentId}

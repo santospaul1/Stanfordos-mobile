@@ -16,7 +16,7 @@ import {
   ErrorBanner,
 } from "../../../components/ui";
 import { Brand } from "../../../constants/brand";
-import { mockMarksService } from "../../../features/marks/mock-marks";
+import { marksService } from "../../../features/marks/marks.service";
 import type { ExamOption, MarksClassOption } from "../../../features/marks/types";
 
 export default function MarksSetupScreen() {
@@ -32,8 +32,8 @@ export default function MarksSetupScreen() {
     setLoading(true);
     try {
       const [e, c] = await Promise.all([
-        mockMarksService.listExams(),
-        mockMarksService.listMyClasses(),
+        marksService.listExams(),
+        marksService.listMyClasses(),
       ]);
       setExams(e);
       setClasses(c);
@@ -63,7 +63,7 @@ export default function MarksSetupScreen() {
       pathname: "/(teacher)/marks/entry",
       params: {
         examId,
-        classSectionId,
+        classSectionId: selectedClass.classSectionId ?? selectedClass.id,
         subjectId: selectedClass.subjectId,
       },
     } as never);

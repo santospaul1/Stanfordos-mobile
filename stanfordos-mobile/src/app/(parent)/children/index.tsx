@@ -16,11 +16,8 @@ import {
   ErrorBanner,
 } from "../../../components/ui";
 import { Brand } from "../../../constants/brand";
-import {
-  mockParentService,
-  type ParentChild,
-} from "../../../features/parent/mock-parent";
-
+import { parentService } from "../../../features/parent/parent.service";
+import type { ParentChild } from "../../../features/parent/mock-parent";
 export default function ParentChildrenScreen() {
   const [children, setChildren] = useState<ParentChild[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -31,9 +28,9 @@ export default function ParentChildrenScreen() {
     setError(null);
     setLoading(true);
     try {
-      const list = await mockParentService.listChildren();
+      const list = await parentService.listChildren();
       setChildren(list);
-      setSelectedId(mockParentService.getSelectedChildId());
+      setSelectedId(parentService.getSelectedChildId());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load children.");
     } finally {
@@ -50,7 +47,7 @@ export default function ParentChildrenScreen() {
   async function handleSelect(childId: string) {
     setError(null);
     try {
-      await mockParentService.selectChild(childId);
+      await parentService.selectChild(childId);
       setSelectedId(childId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not select child.");

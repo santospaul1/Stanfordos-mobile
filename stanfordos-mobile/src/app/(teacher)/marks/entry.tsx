@@ -17,7 +17,7 @@ import {
   ErrorBanner,
 } from "../../../components/ui";
 import { Brand } from "../../../constants/brand";
-import { mockMarksService } from "../../../features/marks/mock-marks";
+import { marksService } from "../../../features/marks/marks.service";
 import type { MarksEntrySheet } from "../../../features/marks/types";
 import { useOnline } from "../../../hooks/use-online";
 
@@ -41,7 +41,7 @@ export default function MarksEntryScreen() {
     setSavedMessage(null);
     setLoading(true);
     try {
-      const data = await mockMarksService.getEntrySheet({
+      const data = await marksService.getEntrySheet({
         examId: params.examId,
         subjectId: params.subjectId,
         classSectionId: params.classSectionId,
@@ -87,8 +87,8 @@ export default function MarksEntryScreen() {
     setSaving(true);
     try {
       requireOnline();
-      await mockMarksService.saveEntrySheet(sheet);
-      setSavedMessage("Marks saved (mock). Live API will require ownership checks.");
+      await marksService.saveEntrySheet(sheet);
+      setSavedMessage("Marks saved successfully.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save marks.");
     } finally {

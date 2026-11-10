@@ -12,12 +12,12 @@ export interface AttendanceStudentRow {
   studentId: string;
   admissionNumber: string;
   fullName: string;
-  status: AttendanceStatus;
+  status: AttendanceStatus | null;
 }
 
 export interface AttendanceEntrySheet {
   classSectionId: string;
   classSectionName: string;
-  date: string; // YYYY-MM-DD
+  date: string;
   rows: AttendanceStudentRow[];
 }
