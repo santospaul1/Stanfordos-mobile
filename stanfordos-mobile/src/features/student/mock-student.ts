@@ -16,6 +16,21 @@ export interface StudentTimetableSlot {
   room?: string | null;
 }
 
+
+export interface StudentSubmissionAttachment {
+  uri: string;
+  name: string;
+  mimeType?: string | null;
+  size?: number | null;
+}
+
+export interface StudentSubmissionAttempt {
+  id: string;
+  submittedAt: string;
+  textContent: string;
+  attachment?: StudentSubmissionAttachment | null;
+}
+
 export interface StudentAssignment {
   id: string;
   title: string;
@@ -27,6 +42,8 @@ export interface StudentAssignment {
   myScore?: number | null;
   mySubmissionText?: string | null;
   submittedAt?: string | null;
+  teacherFeedback?: string;
+  submissionHistory?: StudentSubmissionAttempt[];
 }
 
 export interface StudentResultRow {
@@ -135,7 +152,18 @@ let ASSIGNMENTS: StudentAssignment[] = [
     mySubmissionText: "Lab notes submitted.",
     submittedAt: "2026-11-04T18:00:00Z",
     myScore: 21,
+    teacherFeedback:
+      "Good explanation of the experiment. Improve the conclusion by relating your observations to particle movement.",
+    submissionHistory: [
+      {
+        id: "attempt-sa-3-1",
+        submittedAt: "2026-11-04T18:00:00Z",
+        textContent: "Lab notes submitted.",
+        attachment: null,
+      },
+    ],
   },
+  
   {
     id: "sa-4",
     title: "Map work sheet",
@@ -146,6 +174,8 @@ let ASSIGNMENTS: StudentAssignment[] = [
     description: "Label the colonial trade routes map.",
   },
 ];
+
+
 
 const RESULTS: StudentExamResult[] = [
   {
@@ -291,37 +321,97 @@ export const mockStudentService = {
     return ASSIGNMENTS.map((a) => ({ ...a }));
   },
 
-  async getAssignment(id: string): Promise<StudentAssignment> {
-    await delay(300);
-    const found = ASSIGNMENTS.find((a) => a.id === id);
-    if (!found) throw new Error("Assignment not found.");
-    return { ...found };
+  async listAssignments(): Promise<StudentAssignment[]> {
+    await delay(400);
+    return ASSIGNMENTS.map((assignment) => ({
+      ...assignment,
+      myAttachment: assignment.myAttachment
+        ? { ...assignment.myAttachment }
+        : null,
+      submissionHistory: (assignment.submissionHistory ?? []).map(
+        (attempt) => ({
+          ...attempt,
+          attachment: attempt.attachment ? { ...attempt.attachment } : null,
+        }),
+      ),
+    }));
   },
 
-  /** Online-only submission. No offline queue. */
-  async submitAssignment(id: string, textContent: string): Promise<StudentAssignment> {
-    await delay(600);
-    if (!textContent.trim()) {
-      throw new Error("Write a short response before submitting.");
+  async getAssignment(id: string): Promise<StudentAssignment> {
+    await delay(300);
+
+    const found = ASSIGNMENTS.find((assignment) => assignment.id === id);
+    if (!found) {
+      throw new Error("Assignment not found.");
     }
-    const idx = ASSIGNMENTS.findIndex((a) => a.id === id);
-    if (idx < 0) throw new Error("Assignment not found.");
+
+    return {
+      ...found,
+      myAttachment: found.myAttachment ? { ...found.myAttachment } : null,
+      submissionHistory: (found.submissionHistory ?? []).map((attempt) => ({
+        ...attempt,
+        attachment: attempt.attachment ? { ...attempt.attachment } : null,
+      })),
+    };
+  },
+
+  /** Online-only mock submission. No offline queue or real upload. */
+  async submitAssignment(
+    id: string,
+    textContent: string,
+    attachment?: StudentSubmissionAttachment,
+  ): Promise<StudentAssignment> {
+    await delay(600);
+
+    if (!textContent.trim() && !attachment) {
+      throw new Error("Write a response or attach a file before submitting.");
+    }
+
+    const idx = ASSIGNMENTS.findIndex((assignment) => assignment.id === id);
+    if (idx < 0) {
+      throw new Error("Assignment not found.");
+    }
+
     const current = ASSIGNMENTS[idx];
+
     if (current.status === "GRADED") {
       throw new Error("This assignment is already graded.");
     }
+
+    const submittedAt = new Date().toISOString();
+
+    const attempt: StudentSubmissionAttempt = {
+      id: `attempt-${id}-${Date.now()}`,
+      submittedAt,
+      textContent: textContent.trim(),
+      attachment: attachment ? { ...attachment } : null,
+    };
+
     const updated: StudentAssignment = {
       ...current,
       status: "SUBMITTED",
-      mySubmissionText: textContent.trim(),
-      submittedAt: new Date().toISOString(),
+      mySubmissionText: textContent.trim() || null,
+      myAttachment: attachment
+        ? { ...attachment }
+        : (current.myAttachment ?? null),
+      submittedAt,
+      submissionHistory: [...(current.submissionHistory ?? []), attempt],
     };
+
     ASSIGNMENTS = [
       ...ASSIGNMENTS.slice(0, idx),
       updated,
       ...ASSIGNMENTS.slice(idx + 1),
     ];
-    return { ...updated };
+
+    return {
+      ...updated,
+      myAttachment: updated.myAttachment ? { ...updated.myAttachment } : null,
+      submissionHistory: (updated.submissionHistory ?? []).map((entry) => ({
+        ...entry,
+        attachment: entry.attachment ? { ...entry.attachment } : null,
+      })),
+    };
   },
 
   async listResults(): Promise<StudentExamResult[]> {

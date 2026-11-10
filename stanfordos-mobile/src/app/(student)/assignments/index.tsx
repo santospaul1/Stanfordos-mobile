@@ -16,11 +16,8 @@ import {
   ErrorBanner,
 } from "../../../components/ui";
 import { Brand } from "../../../constants/brand";
-import {
-  mockStudentService,
-  type StudentAssignment,
-} from "../../../features/student/mock-student";
-
+import { studentAssignmentsService } from "../../../features/student/student-assignments.service";
+import type { StudentAssignment } from "../../../features/student/mock-student";
 const STATUS = {
   OPEN: { bg: Brand.primarySoft, text: Brand.primary },
   SUBMITTED: { bg: Brand.warningSoft, text: Brand.warning },
@@ -37,7 +34,7 @@ export default function StudentAssignmentsScreen() {
     setError(null);
     setLoading(true);
     try {
-      setItems(await mockStudentService.listAssignments());
+      setItems(await studentAssignmentsService.listAssignments());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load assignments.");
     } finally {
