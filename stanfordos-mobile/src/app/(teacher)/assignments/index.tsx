@@ -65,9 +65,9 @@ export default function TeacherAssignmentsScreen() {
               <Button
                 title="+ Create assignment"
                 onPress={() =>
-                  router.push("/(teacher)/assignments/new" as never)
+                  router.push("/(teacher)/assignments/create" as never)
                 }
-                style={{ marginTop: 16 }}
+                style={styles.createButton}
               />
               Create class work and review student submissions.
             </Text>

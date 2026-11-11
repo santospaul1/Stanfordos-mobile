@@ -26,19 +26,23 @@ import type {
   AssignmentSubmission,
 } from "../../../features/assignments/types";
 
-const SUB_COLORS = {
-  NOT_SUBMITTED: { bg: "#F1F5F9", text: "#64748B" },
-  SUBMITTED: { bg: Brand.warningSoft, text: Brand.warning },
-  GRADED: { bg: Brand.successSoft, text: Brand.success },
+const SUBMISSION_COLORS = {
+  NOT_SUBMITTED: {
+    backgroundColor: "#F1F5F9",
+    textColor: "#64748B",
+  },
+  SUBMITTED: {
+    backgroundColor: Brand.warningSoft,
+    textColor: Brand.warning,
+  },
+  GRADED: {
+    backgroundColor: Brand.successSoft,
+    textColor: Brand.success,
+  },
 } as const;
 
 export default function AssignmentDetailScreen() {
   const params = useLocalSearchParams<{ assignmentId: string }>();
-  const [gradeDrafts, setGradeDrafts] = useState<Record<string, string>>({});
-  const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>(
-    {},
-  );
-  const [savingGradeId, setSavingGradeId] = useState<string | null>(null);
   const assignmentId = Array.isArray(params.assignmentId)
     ? params.assignmentId[0]
     : params.assignmentId;
@@ -46,44 +50,47 @@ export default function AssignmentDetailScreen() {
   const { online, requireOnline } = useOnline();
 
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
-  const [subs, setSubs] = useState<AssignmentSubmission[]>([]);
+  const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
   const [grades, setGrades] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<Record<string, string>>({});
-  const [savingId, setSavingId] = useState<string | null>(null);
-
   const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!assignmentId) return;
+    if (!assignmentId) {
+      setError("Assignment ID is missing.");
+      setLoading(false);
+      return;
+    }
 
-    setError(null);
     setLoading(true);
+    setError(null);
 
     try {
-      const [detail, submissions] = await Promise.all([
+      const [detail, rows] = await Promise.all([
         assignmentsService.getById(assignmentId),
         assignmentsService.listSubmissions(assignmentId),
       ]);
 
       setAssignment(detail);
-      setSubs(submissions);
+      setSubmissions(rows);
 
       const nextGrades: Record<string, string> = {};
       const nextFeedback: Record<string, string> = {};
 
-      submissions.forEach((submission) => {
-        nextGrades[submission.id] =
-          submission.score == null ? "" : String(submission.score);
-
-        nextFeedback[submission.id] = submission.feedback ?? "";
+      rows.forEach((row) => {
+        nextGrades[row.id] = row.score === null ? "" : String(row.score);
+        nextFeedback[row.id] = row.feedback ?? "";
       });
 
       setGrades(nextGrades);
       setFeedback(nextFeedback);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load assignment.");
+      setError(
+        e instanceof Error ? e.message : "Could not load this assignment.",
+      );
     } finally {
       setLoading(false);
     }
@@ -95,7 +102,7 @@ export default function AssignmentDetailScreen() {
     }, [load]),
   );
 
-  const grade = async (submission: AssignmentSubmission) => {
+  const saveGrade = async (submission: AssignmentSubmission) => {
     if (!assignment) return;
 
     setError(null);
@@ -104,404 +111,406 @@ export default function AssignmentDetailScreen() {
     try {
       requireOnline();
 
-      const scoreText = grades[submission.id] ?? "";
-      const score = Number(scoreText);
+      const rawGrade = grades[submission.id] ?? "";
+      const grade = Number(rawGrade);
 
-      if (scoreText.trim() === "" || !Number.isInteger(score)) {
-        throw new Error("Enter a whole-number grade.");
-      }
-
-      if (score < 0 || score > assignment.maxScore) {
-        throw new Error(`Grade must be between 0 and ${assignment.maxScore}.`);
+      if (
+        rawGrade.trim() === "" ||
+        !Number.isInteger(grade) ||
+        grade < 0 ||
+        grade > assignment.maxScore
+      ) {
+        throw new Error(
+          `Enter a whole-number grade between 0 and ${assignment.maxScore}.`,
+        );
       }
 
       setSavingId(submission.id);
 
       const updated = await assignmentsService.gradeSubmission(
         submission.id,
-        score,
+        grade,
         feedback[submission.id] ?? "",
       );
 
-      setSubs((current) =>
+      setSubmissions((current) =>
         current.map((item) => (item.id === updated.id ? updated : item)),
       );
 
-      setSuccess(`Saved grade for ${submission.studentName}.`);
-      {
-        s.status !== "NOT_SUBMITTED" ? (
-          <View style={styles.grading}>
-            <Text style={styles.gradeLabel}>
-              Grade (out of {assignment?.maxScore})
-            </Text>
+      setGrades((current) => ({
+        ...current,
+        [updated.id]: updated.score === null ? "" : String(updated.score),
+      }));
 
-            <TextInput
-              value={
-                gradeDrafts[s.id] ?? (s.score !== null ? String(s.score) : "")
-              }
-              onChangeText={(value) =>
-                setGradeDrafts((current) => ({
-                  ...current,
-                  [s.id]: value,
-                }))
-              }
-              keyboardType="number-pad"
-              placeholder="Enter score"
-              style={styles.gradeInput}
-            />
+      setFeedback((current) => ({
+        ...current,
+        [updated.id]: updated.feedback ?? "",
+      }));
 
-            <TextInput
-              value={feedbackDrafts[s.id] ?? s.feedback ?? ""}
-              onChangeText={(value) =>
-                setFeedbackDrafts((current) => ({
-                  ...current,
-                  [s.id]: value,
-                }))
-              }
-              placeholder="Feedback for student (optional)"
-              multiline
-              style={[styles.gradeInput, { minHeight: 70 }]}
-            />
-
-            <Button
-              title={s.status === "GRADED" ? "Update grade" : "Save grade"}
-              onPress={() => saveGrade(s)}
-              loading={savingGradeId === s.id}
-              disabled={savingGradeId !== null && savingGradeId !== s.id}
-            />
-          </View>
-        ) : null;
-      }
+      setSuccess(`Grade saved for ${submission.studentName}.`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save grade.");
+      setError(e instanceof Error ? e.message : "Could not save the grade.");
     } finally {
       setSavingId(null);
     }
   };
 
-  async function saveGrade(submission: AssignmentSubmission) {
-    if (!assignment) return;
-
-    const rawGrade =
-      gradeDrafts[submission.id] ??
-      (submission.score !== null ? String(submission.score) : "");
-
-    const grade = Number(rawGrade);
-
-    if (
-      rawGrade.trim() === "" ||
-      !Number.isInteger(grade) ||
-      grade < 0 ||
-      grade > assignment.maxScore
-    ) {
-      setError(
-        `Enter a whole-number grade between 0 and ${assignment.maxScore}.`,
-      );
-      return;
-    }
-
-    setError(null);
-    setSavingGradeId(submission.id);
-
+  const openAttachment = async (url: string) => {
     try {
-      const updated = await assignmentsService.gradeSubmission(
-        submission.id,
-        grade,
-        feedbackDrafts[submission.id] ?? submission.feedback ?? "",
-      );
-
-      setSubs((current) =>
-        current.map((item) => (item.id === updated.id ? updated : item)),
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save the grade.");
-    } finally {
-      setSavingGradeId(null);
+      await Linking.openURL(url);
+    } catch {
+      setError("Could not open the submitted attachment.");
     }
-  }
+  };
 
   return (
     <Screen>
-      <Pressable onPress={() => router.back()} hitSlop={10}>
+      <Pressable
+        onPress={() => router.back()}
+        hitSlop={10}
+        style={styles.backButton}
+      >
         <Text style={styles.back}>‹ Assignments</Text>
       </Pressable>
 
       {loading ? (
-        <ActivityIndicator color={Brand.primary} />
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={Brand.primary} />
+        </View>
       ) : assignment ? (
         <Card style={styles.assignmentCard}>
           <Text style={styles.title}>{assignment.title}</Text>
-          <Text style={styles.subtitle}>{assignment.courseName}</Text>
+
+          <Text style={styles.course}>
+            {assignment.courseName}
+            {assignment.classSectionName
+              ? ` · ${assignment.classSectionName}`
+              : ""}
+          </Text>
 
           <View style={styles.metadata}>
-            <Text style={styles.subtitle}>
-              {assignment.courseName}
-              {assignment.classSectionName
-                ? ` · ${assignment.classSectionName}`
-                : ""}
-            </Text>
+            <View style={styles.metadataItem}>
+              <Text style={styles.metadataLabel}>Due date</Text>
+              <Text style={styles.metadataValue}>
+                {assignment.dueDate
+                  ? new Date(assignment.dueDate).toLocaleDateString()
+                  : "Not set"}
+              </Text>
+            </View>
 
-            <Text style={styles.subtitle}>
-              {assignment.dueDate
-                ? `Due ${new Date(assignment.dueDate).toLocaleDateString()}`
-                : "No due date"}
-              {" · "}
-              Maximum score: {assignment.maxScore}
-            </Text>
+            <View style={styles.metadataItem}>
+              <Text style={styles.metadataLabel}>Maximum score</Text>
+              <Text style={styles.metadataValue}>{assignment.maxScore}</Text>
+            </View>
 
-            <Text style={styles.body}>
-              {assignment.description || "No description provided."}
-            </Text>
+            <View style={styles.metadataItem}>
+              <Text style={styles.metadataLabel}>Submissions</Text>
+              <Text style={styles.metadataValue}>
+                {
+                  submissions.filter((item) => item.status !== "NOT_SUBMITTED")
+                    .length
+                }
+              </Text>
+            </View>
           </View>
 
-          {assignment.description ? (
-            <Text style={styles.description}>{assignment.description}</Text>
-          ) : null}
-
-          <Text style={styles.meta}>{subs.length} submitted</Text>
+          <Text style={styles.description}>
+            {assignment.description || "No instructions provided."}
+          </Text>
         </Card>
-      ) : null}
+      ) : (
+        <EmptyState
+          title="Assignment unavailable"
+          description={error ?? "This assignment could not be found."}
+          actionLabel="Retry"
+          onAction={load}
+        />
+      )}
 
       {error ? <ErrorBanner message={error} /> : null}
 
       {success ? <Text style={styles.success}>{success}</Text> : null}
 
       {!online ? (
-        <ErrorBanner message="You are offline. Viewing is available, but grading requires an internet connection." />
+        <ErrorBanner message="You are offline. You can view submissions, but grading requires an internet connection." />
       ) : null}
 
-      <Text style={styles.section}>Student submissions</Text>
+      {assignment ? (
+        <>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Student submissions</Text>
+            <Text style={styles.sectionCount}>
+              {submissions.length} records
+            </Text>
+          </View>
 
-      {s.textContent ? (
-        <Text style={styles.meta}>Submission: {s.textContent}</Text>
-      ) : null}
+          {!loading && submissions.length === 0 ? (
+            <EmptyState
+              title="No submissions yet"
+              description="Student submissions will appear here."
+            />
+          ) : (
+            <View style={styles.list}>
+              {submissions.map((submission) => {
+                const colors = SUBMISSION_COLORS[submission.status];
+                const isSaving = savingId === submission.id;
+                const canGrade = submission.status !== "NOT_SUBMITTED";
 
-      {s.fileUrl ? (
-        <Pressable
-          onPress={() => {
-            import("react-native").then(({ Linking }) =>
-              Linking.openURL(s.fileUrl!),
-            );
-          }}
-        >
-          <Text style={{ color: Brand.primary, marginTop: 8 }}>
-            View submitted file
-          </Text>
-        </Pressable>
-      ) : null}
+                return (
+                  <Card key={submission.id} style={styles.submissionCard}>
+                    <View style={styles.studentHeader}>
+                      <View style={styles.studentInfo}>
+                        <Text style={styles.studentName}>
+                          {submission.studentName}
+                        </Text>
 
-      {s.feedback ? (
-        <Text style={styles.meta}>Feedback: {s.feedback}</Text>
-      ) : null}
+                        {submission.admissionNumber ? (
+                          <Text style={styles.meta}>
+                            {submission.admissionNumber}
+                          </Text>
+                        ) : null}
 
-      {!loading && subs.length === 0 ? (
-        <EmptyState
-          title="No submissions yet"
-          description="Submitted work will appear here."
-        />
-      ) : (
-        <View style={styles.list}>
-          {subs.map((submission) => {
-            const colors = SUB_COLORS[submission.status];
+                        {submission.submittedAt ? (
+                          <Text style={styles.meta}>
+                            Submitted{" "}
+                            {new Date(submission.submittedAt).toLocaleString()}
+                          </Text>
+                        ) : null}
+                      </View>
 
-            return (
-              <Card key={submission.id} style={styles.submissionCard}>
-                <View style={styles.studentHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.studentName}>
-                      {submission.studentName}
-                    </Text>
-                    {s.admissionNumber ? (
-                      <Text style={styles.meta}>{s.admissionNumber}</Text>
+                      <Badge
+                        label={
+                          submission.status === "GRADED" &&
+                          submission.score !== null
+                            ? `${submission.score}/${assignment.maxScore}`
+                            : submission.status.replace("_", " ")
+                        }
+                        backgroundColor={colors.backgroundColor}
+                        textColor={colors.textColor}
+                      />
+                    </View>
+
+                    {submission.textContent ? (
+                      <View style={styles.response}>
+                        <Text style={styles.responseLabel}>
+                          Student response
+                        </Text>
+                        <Text style={styles.responseText}>
+                          {submission.textContent}
+                        </Text>
+                      </View>
                     ) : null}
-                    {submission.submittedAt ? (
-                      <Text style={styles.meta}>
-                        Submitted:{" "}
-                        {new Date(submission.submittedAt).toLocaleString()}
-                      </Text>
+
+                    {submission.fileUrl ? (
+                      <Pressable
+                        onPress={() => openAttachment(submission.fileUrl!)}
+                        style={styles.attachment}
+                      >
+                        <Text style={styles.attachmentText}>
+                          Open submitted attachment ↗
+                        </Text>
+                      </Pressable>
                     ) : null}
-                  </View>
-
-                  <Badge
-                    label={
-                      submission.status === "GRADED" && submission.score != null
-                        ? `${submission.score}/${assignment?.maxScore ?? ""}`
-                        : submission.status.replace("_", " ")
-                    }
-                    backgroundColor={colors.bg}
-                    textColor={colors.text}
-                  />
-                </View>
-
-                {submission.textContent ? (
-                  <View style={styles.submissionContent}>
-                    <Text style={styles.contentLabel}>Student response</Text>
-                    <Text style={styles.contentText}>
-                      {submission.textContent}
-                    </Text>
-                  </View>
-                ) : null}
-
-                {submission.fileUrl ? (
-                  <Pressable
-                    onPress={() => Linking.openURL(submission.fileUrl!)}
-                    style={styles.fileLink}
-                  >
-                    <Text style={styles.fileLinkText}>
-                      Open submitted attachment ↗
-                    </Text>
-                  </Pressable>
-                ) : null}
-
-                {submission.status !== "NOT_SUBMITTED" ? (
-                  <View style={styles.grading}>
-                    <Text style={styles.inputLabel}>
-                      Grade (out of {assignment?.maxScore ?? 100})
-                    </Text>
-
-                    <TextInput
-                      value={grades[submission.id] ?? ""}
-                      onChangeText={(value) =>
-                        setGrades((current) => ({
-                          ...current,
-                          [submission.id]: value,
-                        }))
-                      }
-                      placeholder="Enter score"
-                      keyboardType="number-pad"
-                      style={styles.input}
-                    />
-
-                    <Text style={styles.inputLabel}>Feedback</Text>
-
-                    <TextInput
-                      value={feedback[submission.id] ?? ""}
-                      onChangeText={(value) =>
-                        setFeedback((current) => ({
-                          ...current,
-                          [submission.id]: value,
-                        }))
-                      }
-                      placeholder="Feedback for the student..."
-                      multiline
-                      textAlignVertical="top"
-                      style={[styles.input, styles.feedbackInput]}
-                    />
 
                     {submission.feedback ? (
                       <Text style={styles.previousFeedback}>
-                        Previously saved feedback: {submission.feedback}
+                        Previous feedback: {submission.feedback}
                       </Text>
                     ) : null}
 
-                    <Button
-                      title={
-                        submission.status === "GRADED"
-                          ? "Update grade"
-                          : "Save grade"
-                      }
-                      onPress={() => grade(submission)}
-                      loading={savingId === submission.id}
-                      disabled={!online || savingId !== null}
-                    />
-                  </View>
-                ) : null}
-              </Card>
-            );
-          })}
-        </View>
-      )}
+                    {canGrade ? (
+                      <View style={styles.grading}>
+                        <Text style={styles.inputLabel}>
+                          Grade out of {assignment.maxScore}
+                        </Text>
+
+                        <TextInput
+                          value={grades[submission.id] ?? ""}
+                          onChangeText={(value) =>
+                            setGrades((current) => ({
+                              ...current,
+                              [submission.id]: value,
+                            }))
+                          }
+                          placeholder="Enter grade"
+                          keyboardType="number-pad"
+                          style={styles.input}
+                        />
+
+                        <Text style={styles.inputLabel}>Feedback</Text>
+
+                        <TextInput
+                          value={feedback[submission.id] ?? ""}
+                          onChangeText={(value) =>
+                            setFeedback((current) => ({
+                              ...current,
+                              [submission.id]: value,
+                            }))
+                          }
+                          placeholder="Write feedback for the student..."
+                          multiline
+                          textAlignVertical="top"
+                          style={[styles.input, styles.feedbackInput]}
+                        />
+
+                        <Button
+                          title={
+                            submission.status === "GRADED"
+                              ? "Update grade"
+                              : "Save grade"
+                          }
+                          onPress={() => saveGrade(submission)}
+                          loading={isSaving}
+                          disabled={!online || savingId !== null}
+                        />
+                      </View>
+                    ) : (
+                      <Text style={styles.notSubmitted}>
+                        This student has not submitted this assignment.
+                      </Text>
+                    )}
+                  </Card>
+                );
+              })}
+            </View>
+          )}
+        </>
+      ) : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  backButton: {
+    marginBottom: 16,
+  },
   back: {
     color: Brand.primary,
     fontSize: 16,
     fontWeight: "700",
-    marginBottom: 16,
   },
-  assignmentCard: { marginBottom: 20 },
+  loading: {
+    paddingVertical: 48,
+    alignItems: "center",
+  },
+  assignmentCard: {
+    marginBottom: 22,
+  },
   title: {
+    color: Brand.text,
     fontSize: 22,
     fontWeight: "800",
-    color: Brand.text,
   },
-  subtitle: {
-    marginTop: 5,
-    fontSize: 14,
+  course: {
     color: Brand.textSecondary,
+    fontSize: 14,
+    marginTop: 6,
   },
   metadata: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 14,
-    marginTop: 12,
+    gap: 20,
+    marginTop: 20,
   },
-  meta: {
-    marginTop: 5,
-    fontSize: 12,
-    color: Brand.textSecondary,
+  metadataItem: {
+    minWidth: 85,
+  },
+  metadataLabel: {
+    color: Brand.textMuted,
+    fontSize: 11,
+  },
+  metadataValue: {
+    color: Brand.text,
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: 4,
   },
   description: {
-    marginTop: 14,
+    color: Brand.text,
     fontSize: 14,
     lineHeight: 21,
-    color: Brand.text,
+    marginTop: 18,
   },
-  section: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: Brand.text,
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 12,
   },
-  list: { gap: 12 },
-  submissionCard: { gap: 8 },
+  sectionTitle: {
+    color: Brand.text,
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  sectionCount: {
+    color: Brand.textSecondary,
+    fontSize: 12,
+  },
+  list: {
+    gap: 12,
+  },
+  submissionCard: {
+    gap: 10,
+  },
   studentHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
   },
+  studentInfo: {
+    flex: 1,
+  },
   studentName: {
+    color: Brand.text,
     fontSize: 15,
     fontWeight: "800",
-    color: Brand.text,
   },
-  submissionContent: {
+  meta: {
+    color: Brand.textSecondary,
+    fontSize: 12,
+    marginTop: 4,
+  },
+  response: {
     backgroundColor: Brand.background,
     borderRadius: 10,
     padding: 12,
-    marginTop: 8,
+    marginTop: 6,
   },
-  contentLabel: {
+  responseLabel: {
     color: Brand.textSecondary,
     fontSize: 11,
     fontWeight: "700",
     marginBottom: 6,
   },
-  contentText: {
+  responseText: {
     color: Brand.text,
     fontSize: 13,
     lineHeight: 20,
   },
-  fileLink: { paddingVertical: 8 },
-  fileLinkText: {
+  attachment: {
+    paddingVertical: 8,
+  },
+  attachmentText: {
     color: Brand.primary,
     fontSize: 13,
     fontWeight: "700",
+  },
+  previousFeedback: {
+    color: Brand.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
   },
   grading: {
     borderTopWidth: 1,
     borderTopColor: Brand.border,
     paddingTop: 14,
-    marginTop: 8,
-    gap: 8,
+    marginTop: 6,
+    gap: 9,
   },
   inputLabel: {
+    color: Brand.textSecondary,
     fontSize: 12,
     fontWeight: "700",
-    color: Brand.textSecondary,
   },
   input: {
     minHeight: 46,
@@ -509,45 +518,22 @@ const styles = StyleSheet.create({
     borderColor: Brand.borderStrong,
     borderRadius: 10,
     paddingHorizontal: 12,
+    paddingVertical: 10,
     color: Brand.text,
     backgroundColor: Brand.surface,
   },
   feedbackInput: {
     minHeight: 90,
-    paddingTop: 12,
   },
-  previousFeedback: {
+  notSubmitted: {
+    color: Brand.textMuted,
     fontSize: 12,
-    color: Brand.textSecondary,
-    lineHeight: 18,
+    fontStyle: "italic",
   },
   success: {
     color: Brand.success,
     fontSize: 13,
     fontWeight: "700",
     marginBottom: 12,
-  },
-
-  grading: {
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: Brand.border,
-    gap: 9,
-  },
-  gradeLabel: {
-    color: Brand.text,
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  gradeInput: {
-    minHeight: 46,
-    borderWidth: 1,
-    borderColor: Brand.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: Brand.text,
-    backgroundColor: Brand.surface,
   },
 });

@@ -18,10 +18,9 @@ import {
 } from "../../../components/ui";
 import { Brand } from "../../../constants/brand";
 import { assignmentsService } from "../../../features/assignments/assignments.service";
-import type { TeacherCourse } from "../../../features/assignments/types";
-
+import type { TeacherCourseOption } from "../../../features/assignments/types";
 export default function CreateAssignmentScreen() {
-  const [courses, setCourses] = useState<TeacherCourse[]>([]);
+  const [courses, setCourses] = useState<TeacherCourseOption[]>([]);
   const [courseId, setCourseId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -84,11 +83,31 @@ export default function CreateAssignmentScreen() {
     setSaving(true);
 
     try {
-      const created = await assignmentsService.create({
-        courseId,
-        title,
-        description,
-        dueDate: dueDate.trim(),
+      const trimmedDueDate = dueDate.trim();
+      let dueDateIso: string | null = null;
+
+      if (trimmedDueDate) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmedDueDate)) {
+          setError("Enter the due date as YYYY-MM-DD.");
+          return;
+        }
+
+        const parsed = new Date(`${trimmedDueDate}T23:59:00`);
+
+        if (
+          Number.isNaN(parsed.getTime()) ||
+          parsed.toISOString().slice(0, 10) !== trimmedDueDate
+        ) {
+          setError("Enter a valid due date.");
+          return;
+        }
+
+        dueDateIso = parsed.toISOString();
+      }
+      const created = await assignmentsService.create(courseId, {
+        title: title.trim(),
+        description: description.trim(),
+        dueDate: dueDateIso,
         maxScore: parsedMaxScore,
       });
 

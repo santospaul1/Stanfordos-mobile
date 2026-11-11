@@ -34,6 +34,7 @@ export interface AssignmentSubmission {
 export interface TeacherCourseOption {
   id: string;
   title: string;
+  description?: string | null;
 }
 
 export interface CreateAssignmentInput {

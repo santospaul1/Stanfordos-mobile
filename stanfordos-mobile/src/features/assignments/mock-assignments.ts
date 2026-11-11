@@ -2,6 +2,8 @@ import type {
   AssignmentDetail,
   AssignmentSubmission,
   AssignmentSummary,
+  CreateAssignmentInput,
+  TeacherCourseOption,
 } from "./types";
 
 const ASSIGNMENTS: AssignmentDetail[] = [
@@ -86,13 +88,17 @@ export const mockAssignmentsService = {
   ): Promise<AssignmentSubmission> {
     await delay(250);
 
+    if (!Number.isInteger(grade) || grade < 0) {
+      throw new Error("Enter a valid grade.");
+    }
+
     const match = submissionId.match(/^sub-(.+)-(\d+)$/);
 
     if (!match) {
       throw new Error("Invalid submission.");
     }
 
-    const [, assignmentId, studentNumber] = match;
+    const [, assignmentId] = match;
     const assignment = ASSIGNMENTS.find((item) => item.id === assignmentId);
 
     if (!assignment) {
@@ -111,24 +117,19 @@ export const mockAssignmentsService = {
     return result;
   },
 
-  async listMyCourses() {
+  async listMyCourses(): Promise<TeacherCourseOption[]> {
     await delay(200);
 
     return [
-      { id: "mock-course-mathematics", title: "Mathematics" },
-      { id: "mock-course-physics", title: "Physics" },
-      { id: "mock-course-history", title: "History" },
+      { id: "course-math", title: "Mathematics", description: "" },
+      { id: "course-physics", title: "Physics", description: "" },
+      { id: "course-history", title: "History", description: "" },
     ];
   },
 
   async create(
     courseId: string,
-    input: {
-      title: string;
-      description: string;
-      dueDate: string | null;
-      maxScore: number;
-    },
+    input: CreateAssignmentInput,
   ): Promise<AssignmentDetail> {
     await delay(300);
 
@@ -141,9 +142,8 @@ export const mockAssignmentsService = {
 
     const created: AssignmentDetail = {
       id: `mock-asg-${Date.now()}`,
-      courseId,
-      title: input.title,
-      description: input.description,
+      title: input.title.trim(),
+      description: input.description.trim(),
       courseName: course.title,
       dueDate: input.dueDate,
       maxScore: input.maxScore,
@@ -157,66 +157,6 @@ export const mockAssignmentsService = {
     return { ...created };
   },
 
-  async listMyCourses() {
-    await delay(200);
-
-    return [
-      { id: "course-math", title: "Mathematics", description: "" },
-      { id: "course-physics", title: "Physics", description: "" },
-      { id: "course-history", title: "History", description: "" },
-    ];
-  },
-
-  async create(input: {
-    courseId: string;
-    title: string;
-    description: string;
-    dueDate: string;
-    maxScore: number;
-  }) {
-    await delay(250);
-
-    const course = (await this.listMyCourses()).find(
-      (item) => item.id === input.courseId,
-    );
-
-    if (!course) throw new Error("Select a valid course.");
-
-    const created = {
-      id: `asg-${Date.now()}`,
-      courseId: input.courseId,
-      title: input.title.trim(),
-      courseName: course.title,
-      dueDate: input.dueDate || "No due date",
-      maxScore: input.maxScore,
-      status: "PUBLISHED" as const,
-      submissionCount: 0,
-      studentCount: 0,
-      description: input.description.trim(),
-      createdAt: new Date().toISOString(),
-    };
-
-    ASSIGNMENTS.unshift(created);
-    return { ...created };
-  },
-
-  async gradeSubmission(submissionId: string, grade: number, feedback: string) {
-    await delay(250);
-
-    if (!Number.isInteger(grade) || grade < 0) {
-      throw new Error("Enter a valid grade.");
-    }
-
-    return {
-      id: submissionId,
-      studentId: "",
-      studentName: "Mock student",
-      submittedAt: new Date().toISOString(),
-      score: grade,
-      status: "GRADED" as const,
-      feedback,
-    };
-  },
   async getById(id: string): Promise<AssignmentDetail> {
     await delay(350);
     const found = ASSIGNMENTS.find((a) => a.id === id);
@@ -229,23 +169,29 @@ export const mockAssignmentsService = {
     const assignment = ASSIGNMENTS.find((a) => a.id === assignmentId);
     if (!assignment) throw new Error("Assignment not found.");
 
-    return NAMES.slice(0, Math.min(12, assignment.studentCount)).map(
+    const studentCount = assignment.studentCount ?? 0;
+    const submissionCount = assignment.submissionCount ?? 0;
+
+    return NAMES.slice(0, Math.min(12, studentCount)).map(
       (studentName, i) => {
-        const submitted = i < assignment.submissionCount;
-        const graded = submitted && i % 3 === 0;
+        const submitted = i < submissionCount;
+        const id = `sub-${assignmentId}-${i + 1}`;
+        const override = GRADE_OVERRIDES.get(id);
+        const graded = override !== undefined || (submitted && i % 3 === 0);
         return {
-          id: `sub-${assignmentId}-${i + 1}`,
+          id,
           studentId: `s-${i + 1}`,
           studentName,
           admissionNumber: `ADM${String(i + 1).padStart(4, "0")}`,
           submittedAt: submitted ? "2026-11-09T10:00:00Z" : null,
-          score: graded ? 12 + (i % 8) : null,
+          score: override?.score ?? (graded ? 12 + (i % 8) : null),
           status: graded
             ? ("GRADED" as const)
             : submitted
               ? ("SUBMITTED" as const)
               : ("NOT_SUBMITTED" as const),
           textContent: submitted ? "Student submission text (mock)." : null,
+          feedback: override?.feedback ?? null,
         };
       },
     );
